@@ -12,8 +12,6 @@ import BrandMark from '../../components/common/BrandMark.jsx';
 import AuthHeader from '../../components/auth/AuthHeader.jsx';
 import ControlledTextField from '../../components/forms/ControlledTextField.jsx';
 import PasswordField from '../../components/forms/PasswordField.jsx';
-import AuthDivider from '../../components/auth/AuthDivider.jsx';
-import SocialAuthButtons from '../../components/auth/SocialAuthButtons.jsx';
 import AuthRedirectPrompt from '../../components/auth/AuthRedirectPrompt.jsx';
 import ControlledCheckbox from '../../components/forms/ControlledCheckbox.jsx';
 
@@ -70,8 +68,6 @@ const LoginPage = () => {
           Sign in
         </Button>
       </Stack>
-      <AuthDivider />
-      <SocialAuthButtons onProviderClick={() => {}} />
       <AuthRedirectPrompt prompt="New to TellerRecipes?" cta="Create an account" href="/auth/register" />
     </AuthLayout>
   );

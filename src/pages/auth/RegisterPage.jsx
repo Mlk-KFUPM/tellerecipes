@@ -11,8 +11,6 @@ import BrandMark from '../../components/common/BrandMark.jsx';
 import AuthHeader from '../../components/auth/AuthHeader.jsx';
 import ControlledTextField from '../../components/forms/ControlledTextField.jsx';
 import PasswordField from '../../components/forms/PasswordField.jsx';
-import AuthDivider from '../../components/auth/AuthDivider.jsx';
-import SocialAuthButtons from '../../components/auth/SocialAuthButtons.jsx';
 import AuthRedirectPrompt from '../../components/auth/AuthRedirectPrompt.jsx';
 
 const RegisterPage = () => {
@@ -59,8 +57,6 @@ const RegisterPage = () => {
           Create account
         </Button>
       </Stack>
-      <AuthDivider />
-      <SocialAuthButtons onProviderClick={() => {}} />
       <AuthRedirectPrompt prompt="Already have an account?" cta="Sign in" href="/auth/login" />
     </AuthLayout>
   );
