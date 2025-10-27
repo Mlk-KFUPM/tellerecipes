@@ -30,7 +30,7 @@ const CollectionsPage = () => {
   };
 
   const handleViewRecipe = (recipeId) => {
-    navigate(`/app/recipes/${recipeId}`);
+    navigate(`/app/user/recipes/${recipeId}`);
   };
 
   return (

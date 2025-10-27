@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
@@ -18,16 +19,9 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { NavLink } from 'react-router-dom';
 import { useAppState } from '../context/AppStateContext.jsx';
 
-const navItems = [
-  { label: 'Home', to: '/app' },
-  { label: 'Collections', to: '/app/collections' },
-  { label: 'Shopping List', to: '/app/shopping-list' },
-  { label: 'Profile', to: '/app/profile' },
-];
-
-const DashboardLayout = () => {
+const DashboardLayout = ({ role }) => {
   const navigate = useNavigate();
-  const { user, shoppingList } = useAppState();
+  const { user, shoppingList, session } = useAppState();
   const [anchorEl, setAnchorEl] = useState(null);
   const [navAnchorEl, setNavAnchorEl] = useState(null);
 
@@ -59,6 +53,27 @@ const DashboardLayout = () => {
     handleNavMenuClose();
     handleProfileMenuClose();
   };
+
+  const currentRole = role || session.role;
+
+  const navItems = useMemo(() => {
+    if (currentRole === 'chef') {
+      return [{ label: 'Chef Dashboard', to: '/app/chef' }];
+    }
+
+    if (currentRole === 'admin') {
+      return [{ label: 'Admin Dashboard', to: '/app/admin' }];
+    }
+
+    return [
+      { label: 'Home', to: '/app/user' },
+      { label: 'Collections', to: '/app/user/collections' },
+      { label: 'Shopping List', to: '/app/user/shopping-list' },
+      { label: 'Profile', to: '/app/user/profile' },
+    ];
+  }, [currentRole]);
+
+  const shoppingListRoute = currentRole === 'user' ? '/app/user/shopping-list' : null;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -94,13 +109,15 @@ const DashboardLayout = () => {
           </Stack>
 
           <Stack direction="row" spacing={1} alignItems="center">
-            <Tooltip title="Shopping list">
-              <IconButton color="primary" onClick={() => handleNavigate('/app/shopping-list')}>
-                <Badge color="primary" badgeContent={shoppingListCount} max={99}>
-                  <ShoppingBagIcon />
-                </Badge>
-              </IconButton>
-            </Tooltip>
+            {shoppingListRoute && (
+              <Tooltip title="Shopping list">
+                <IconButton color="primary" onClick={() => handleNavigate(shoppingListRoute)}>
+                  <Badge color="primary" badgeContent={shoppingListCount} max={99}>
+                    <ShoppingBagIcon />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="Account settings">
               <IconButton onClick={handleProfileMenuOpen} size="small" sx={{ bgcolor: 'primary.main', color: 'primary.contrastText' }}>
                 <Avatar sx={{ bgcolor: 'transparent', width: 36, height: 36, fontWeight: 600 }}>{avatarInitials}</Avatar>
@@ -119,7 +136,7 @@ const DashboardLayout = () => {
       </Menu>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleProfileMenuClose}>
-        <MenuItem onClick={() => handleNavigate('/app/profile')}>Profile</MenuItem>
+        {currentRole === 'user' && <MenuItem onClick={() => handleNavigate('/app/user/profile')}>Profile</MenuItem>}
         <MenuItem onClick={() => handleNavigate('/auth/login')}>Sign out</MenuItem>
       </Menu>
 
@@ -128,6 +145,14 @@ const DashboardLayout = () => {
       </Container>
     </Box>
   );
+};
+
+DashboardLayout.propTypes = {
+  role: PropTypes.oneOf(['user', 'chef', 'admin']),
+};
+
+DashboardLayout.defaultProps = {
+  role: undefined,
 };
 
 export default DashboardLayout;

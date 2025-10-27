@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Button from '@mui/material/Button';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Link from '@mui/material/Link';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import AuthLayout from '../../layouts/AuthLayout.jsx';
 import BrandMark from '../../components/common/BrandMark.jsx';
 import AuthHeader from '../../components/auth/AuthHeader.jsx';
@@ -14,15 +16,18 @@ import ControlledTextField from '../../components/forms/ControlledTextField.jsx'
 import PasswordField from '../../components/forms/PasswordField.jsx';
 import AuthRedirectPrompt from '../../components/auth/AuthRedirectPrompt.jsx';
 import ControlledCheckbox from '../../components/forms/ControlledCheckbox.jsx';
+import { useAppDispatch } from '../../context/AppStateContext.jsx';
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const schema = useMemo(
     () =>
       z.object({
         email: z.string().min(1, 'Email is required'),
         password: z.string().min(1, 'Password is required'),
-        remember: z.boolean().optional(),
+        remember: z.boolean(),
+        role: z.enum(['user', 'chef', 'admin']),
       }),
     [],
   );
@@ -37,6 +42,7 @@ const LoginPage = () => {
       email: 'amina.baker@example.com',
       password: 'password123',
       remember: true,
+      role: 'user',
     },
   });
 
@@ -44,7 +50,11 @@ const LoginPage = () => {
     // TODO: integrate with auth API layer.
     // eslint-disable-next-line no-console
     console.log('login submit', values);
-    navigate('/app');
+    dispatch({ type: 'SET_SESSION_ROLE', payload: values.role });
+
+    const nextRoute =
+      values.role === 'chef' ? '/app/chef' : values.role === 'admin' ? '/app/admin' : '/app/user';
+    navigate(nextRoute);
   });
 
   return (
@@ -64,6 +74,17 @@ const LoginPage = () => {
             Forgot password?
           </Link>
         </Stack>
+        <Controller
+          name="role"
+          control={control}
+          render={({ field }) => (
+            <TextField select label="Sign in as" {...field}>
+              <MenuItem value="user">Registered User</MenuItem>
+              <MenuItem value="chef">Chef</MenuItem>
+              <MenuItem value="admin">Admin</MenuItem>
+            </TextField>
+          )}
+        />
         <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
           Sign in
         </Button>

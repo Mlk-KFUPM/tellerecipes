@@ -8,6 +8,7 @@ const AppDispatchContext = createContext();
 const initialState = {
   session: {
     isAuthenticated: true,
+    role: 'user',
   },
   user: {
     id: 'user-001',
@@ -121,6 +122,15 @@ const appReducer = (state, action) => {
       return {
         ...state,
         recipes: updatedRecipes,
+      };
+    }
+    case 'SET_SESSION_ROLE': {
+      return {
+        ...state,
+        session: {
+          ...state.session,
+          role: action.payload,
+        },
       };
     }
     default:
