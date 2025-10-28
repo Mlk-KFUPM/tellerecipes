@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import AuthLayout from '../../layouts/AuthLayout.jsx';
 import BrandMark from '../../components/common/BrandMark.jsx';
 import AuthHeader from '../../components/auth/AuthHeader.jsx';
@@ -90,6 +91,12 @@ const LoginPage = () => {
         </Button>
       </Stack>
       <AuthRedirectPrompt prompt="New to TellerRecipes?" cta="Create an account" href="/auth/register" />
+      <Typography variant="body2" color="text.secondary">
+        Ready to share your own dishes?{' '}
+        <Link component={RouterLink} to="/auth/become-chef" underline="hover">
+          Apply to become a chef
+        </Link>
+      </Typography>
     </AuthLayout>
   );
 };

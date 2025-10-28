@@ -10,13 +10,21 @@ import ShoppingListPage from "./pages/user/ShoppingListPage.jsx";
 import ProfilePage from "./pages/user/ProfilePage.jsx";
 import RecipeDetailPage from "./pages/user/RecipeDetailPage.jsx";
 import ChefDashboardPage from "./pages/chef/ChefDashboardPage.jsx";
+import ChefProfilePage from "./pages/chef/ChefProfilePage.jsx";
+import ChefRecipesPage from "./pages/chef/ChefRecipesPage.jsx";
+import ChefReviewsPage from "./pages/chef/ChefReviewsPage.jsx";
+import ChefAnalyticsPage from "./pages/chef/ChefAnalyticsPage.jsx";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage.jsx";
+import ChefApplicationPage from "./pages/chef/ChefApplicationPage.jsx";
+import ChefApplicationPendingPage from "./pages/chef/ChefApplicationPendingPage.jsx";
 
 const App = () => (
   <Routes>
     <Route path="/" element={<Navigate to="/auth/login" replace />} />
     <Route path="/auth/login" element={<LoginPage />} />
     <Route path="/auth/register" element={<RegisterPage />} />
+    <Route path="/auth/become-chef" element={<ChefApplicationPage />} />
+    <Route path="/auth/become-chef/pending" element={<ChefApplicationPendingPage />} />
     <Route element={<ProtectedRoute />}>
       <Route path="/app" element={<Navigate to="/app/user" replace />} />
       <Route path="/app/user" element={<DashboardLayout role="user" />}>
@@ -29,6 +37,10 @@ const App = () => (
       <Route element={<RoleRoute allowedRoles={["chef"]} redirectTo="/app/user" />}>
         <Route path="/app/chef" element={<DashboardLayout role="chef" />}>
           <Route index element={<ChefDashboardPage />} />
+          <Route path="profile" element={<ChefProfilePage />} />
+          <Route path="recipes" element={<ChefRecipesPage />} />
+          <Route path="reviews" element={<ChefReviewsPage />} />
+          <Route path="analytics" element={<ChefAnalyticsPage />} />
         </Route>
       </Route>
       <Route element={<RoleRoute allowedRoles={["admin"]} redirectTo="/app/user" />}>
