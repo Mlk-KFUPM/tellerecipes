@@ -62,7 +62,13 @@ const DashboardLayout = ({ role }) => {
     }
 
     if (currentRole === 'admin') {
-      return [{ label: 'Admin Dashboard', to: '/app/admin' }];
+      return [
+        { label: 'Dashboard', to: '/app/admin' },
+        { label: 'Categories', to: '/app/admin/categories' },
+        { label: 'Moderation', to: '/app/admin/recipe-moderation' },
+        { label: 'Flagged', to: '/app/admin/flagged-content' },
+        { label: 'Users', to: '/app/admin/user-management' },
+      ];
     }
 
     return [
