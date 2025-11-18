@@ -17,6 +17,10 @@ import ChefAnalyticsPage from "./pages/chef/ChefAnalyticsPage.jsx";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage.jsx";
 import ChefApplicationPage from "./pages/chef/ChefApplicationPage.jsx";
 import ChefApplicationPendingPage from "./pages/chef/ChefApplicationPendingPage.jsx";
+import CategoriesPage from "./pages/admin/CategoriesPage.jsx";
+import RecipeModerationPage from "./pages/admin/RecipeModerationPage.jsx";
+import FlaggedContentPage from "./pages/admin/FlaggedContentPage.jsx";
+import UserManagementPage from "./pages/admin/UserManagementPage.jsx";
 
 const App = () => (
   <Routes>
@@ -46,6 +50,10 @@ const App = () => (
       <Route element={<RoleRoute allowedRoles={["admin"]} redirectTo="/app/user" />}>
         <Route path="/app/admin" element={<DashboardLayout role="admin" />}>
           <Route index element={<AdminDashboardPage />} />
+          <Route path="categories" element={<CategoriesPage />} />
+          <Route path="recipe-moderation" element={<RecipeModerationPage />} />
+          <Route path="flagged-content" element={<FlaggedContentPage />} />
+          <Route path="user-management" element={<UserManagementPage />} />
         </Route>
       </Route>
     </Route>
