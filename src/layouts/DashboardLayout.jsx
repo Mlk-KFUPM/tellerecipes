@@ -58,7 +58,13 @@ const DashboardLayout = ({ role }) => {
 
   const navItems = useMemo(() => {
     if (currentRole === 'chef') {
-      return [{ label: 'Chef Dashboard', to: '/app/chef' }];
+      return [
+        { label: 'Overview', to: '/app/chef' },
+        { label: 'Profile', to: '/app/chef/profile' },
+        { label: 'Recipes', to: '/app/chef/recipes' },
+        { label: 'Reviews', to: '/app/chef/reviews' },
+        { label: 'Analytics', to: '/app/chef/analytics' },
+      ];
     }
 
     if (currentRole === 'admin') {
@@ -80,6 +86,7 @@ const DashboardLayout = ({ role }) => {
   }, [currentRole]);
 
   const shoppingListRoute = currentRole === 'user' ? '/app/user/shopping-list' : null;
+  const roleProfileRoute = currentRole === 'user' ? '/app/user/profile' : currentRole === 'chef' ? '/app/chef/profile' : null;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -142,7 +149,7 @@ const DashboardLayout = ({ role }) => {
       </Menu>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleProfileMenuClose}>
-        {currentRole === 'user' && <MenuItem onClick={() => handleNavigate('/app/user/profile')}>Profile</MenuItem>}
+        {roleProfileRoute && <MenuItem onClick={() => handleNavigate(roleProfileRoute)}>Profile</MenuItem>}
         <MenuItem onClick={() => handleNavigate('/auth/login')}>Sign out</MenuItem>
       </Menu>
 

@@ -1,9 +1,10 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Button from "@mui/material/Button";
+import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import AuthLayout from "../../layouts/AuthLayout.jsx";
@@ -87,6 +88,12 @@ const RegisterPage = () => {
         cta="Sign in"
         href="/auth/login"
       />
+      <Typography variant="body2" color="text.secondary">
+        Looking to publish your own recipes?{" "}
+        <Link component={RouterLink} to="/auth/become-chef" underline="hover">
+          Apply to become a chef
+        </Link>
+      </Typography>
     </AuthLayout>
   );
 };
