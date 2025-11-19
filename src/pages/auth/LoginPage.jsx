@@ -51,7 +51,12 @@ const LoginPage = () => {
     // TODO: integrate with auth API layer.
     // eslint-disable-next-line no-console
     console.log('login submit', values);
-    dispatch({ type: 'SET_SESSION_ROLE', payload: values.role });
+    const actorIdByRole = {
+      admin: 'admin-001',
+      chef: 'user-001',
+      user: 'user-001',
+    };
+    dispatch({ type: 'SIGN_IN', payload: { role: values.role, actorId: actorIdByRole[values.role] } });
 
     const nextRoute =
       values.role === 'chef' ? '/app/chef' : values.role === 'admin' ? '/app/admin' : '/app/user';

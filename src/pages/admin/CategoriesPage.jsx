@@ -1,68 +1,94 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
-import RecipeGrid from '../../components/recipes/RecipeGrid.jsx';
-import { useAppState, selectFilters } from '../../context/AppStateContext.jsx';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemSecondaryAction from '@mui/material/ListItemSecondaryAction';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { useAppDispatch, useAppState } from '../../context/AppStateContext.jsx';
+
+const TYPES = [
+  { label: 'Categories', value: 'category', helper: 'General groupings surfaced across the site.' },
+  { label: 'Cuisines', value: 'cuisine', helper: 'Used in filters and discovery modules.' },
+  { label: 'Dietary Tags', value: 'dietary', helper: 'Appears on recipe cards and filters.' },
+];
 
 const CategoriesPage = () => {
-  const navigate = useNavigate();
-  const state = useAppState();
-  const { recipeSummaries } = state;
-  const { cuisines, dietary } = selectFilters(state);
-
+  const dispatch = useAppDispatch();
+  const { admin } = useAppState();
+  const [type, setType] = useState('category');
   const [search, setSearch] = useState('');
-  const [mode, setMode] = useState('cuisine'); // 'cuisine' | 'dietary'
-  const [selected, setSelected] = useState(null);
+  const [newLabel, setNewLabel] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [feedback, setFeedback] = useState(null);
 
-  const categoryCounts = useMemo(() => {
-    const counts = new Map();
-    if (mode === 'cuisine') {
-      recipeSummaries.forEach((r) => counts.set(r.cuisine, (counts.get(r.cuisine) ?? 0) + 1));
-    } else {
-      recipeSummaries.forEach((r) => r.dietary.forEach((d) => counts.set(d, (counts.get(d) ?? 0) + 1)));
-    }
-    return counts;
-  }, [recipeSummaries, mode]);
-
-  const categories = useMemo(() => {
-    const list = mode === 'cuisine' ? cuisines : dietary;
+  const items = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return list
-      .filter((c) => (term ? c.toLowerCase().includes(term) : true))
-      .map((c) => ({ name: c, count: categoryCounts.get(c) ?? 0 }));
-  }, [cuisines, dietary, mode, search, categoryCounts]);
+    return admin.categories
+      .filter((category) => category.type === type)
+      .filter((category) => (term ? category.label.toLowerCase().includes(term) : true))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [admin.categories, type, search]);
 
-  const filteredRecipes = useMemo(() => {
-    if (!selected) return [];
-    if (mode === 'cuisine') {
-      return recipeSummaries.filter((r) => r.cuisine === selected);
+  const isDuplicate = (label, ignoreId = null) =>
+    admin.categories.some(
+      (category) =>
+        category.type === type &&
+        category.label.toLowerCase() === label.trim().toLowerCase() &&
+        category.id !== ignoreId,
+    );
+
+  const handleAdd = () => {
+    if (!newLabel.trim() || isDuplicate(newLabel)) {
+      setFeedback({ severity: 'error', message: 'Enter a unique name before adding.' });
+      return;
     }
-    return recipeSummaries.filter((r) => r.dietary.includes(selected));
-  }, [recipeSummaries, selected, mode]);
-
-  const handleOpenRecipe = (recipe) => {
-    // Reuse existing user recipe detail page to view
-    navigate(`/app/user/recipes/${recipe.id}`);
+    dispatch({ type: 'ADMIN_ADD_CATEGORY', payload: { label: newLabel.trim(), type } });
+    setFeedback({ severity: 'success', message: `${TYPES.find((t) => t.value === type)?.label ?? 'Entry'} added.` });
+    setNewLabel('');
   };
 
-  const noop = () => {};
+  const handleSaveEdit = () => {
+    if (!editing?.value.trim()) {
+      setFeedback({ severity: 'error', message: 'Label cannot be empty.' });
+      return;
+    }
+    if (isDuplicate(editing.value, editing.id)) {
+      setFeedback({ severity: 'error', message: 'Name must be unique.' });
+      return;
+    }
+    dispatch({ type: 'ADMIN_UPDATE_CATEGORY', payload: { id: editing.id, label: editing.value.trim() } });
+    setFeedback({ severity: 'success', message: 'Label updated.' });
+    setEditing(null);
+  };
+
+  const handleDelete = (id) => {
+    dispatch({ type: 'ADMIN_DELETE_CATEGORY', payload: { id } });
+    setFeedback({ severity: 'info', message: 'Entry removed.' });
+  };
+
+  const helperText = TYPES.find((item) => item.value === type)?.helper;
 
   return (
     <Stack spacing={4}>
       <Stack spacing={1}>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          Categories
+          Configure categories & filters
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Browse by cuisine or dietary tag. Select a category to view matching recipes.
+          Curate the lists chefs can assign to recipes and the filters surfaced to diners.
         </Typography>
       </Stack>
 
@@ -71,69 +97,109 @@ const CategoriesPage = () => {
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3 }}>
             <Stack spacing={2}>
               <ToggleButtonGroup
-                color="primary"
-                value={mode}
+                value={type}
                 exclusive
-                onChange={(_, val) => val && setMode(val)}
+                onChange={(_, value) => value && setType(value)}
                 size="small"
+                color="primary"
               >
-                <ToggleButton value="cuisine">Cuisines</ToggleButton>
-                <ToggleButton value="dietary">Dietary</ToggleButton>
-              </ToggleButtonGroup>
-              <TextField
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                label="Search categories"
-                placeholder="Type to filter"
-              />
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {categories.map((c) => (
-                  <Chip
-                    key={c.name}
-                    label={`${c.name} · ${c.count}`}
-                    color={selected === c.name ? 'primary' : 'default'}
-                    onClick={() => setSelected(c.name)}
-                    sx={{ mr: 1, mb: 1 }}
-                  />
+                {TYPES.map((item) => (
+                  <ToggleButton key={item.value} value={item.value}>
+                    {item.label}
+                  </ToggleButton>
                 ))}
-                {!categories.length && (
-                  <Typography variant="body2" color="text.secondary">
-                    No categories match your search.
-                  </Typography>
-                )}
-              </Stack>
-              <Stack direction="row" spacing={1}>
-                <Button variant="outlined" onClick={() => setSelected(null)} disabled={!selected}>
-                  Clear selection
-                </Button>
-              </Stack>
+              </ToggleButtonGroup>
+              <Typography variant="body2" color="text.secondary">
+                {helperText}
+              </Typography>
+              <TextField
+                label="Search entries"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Type to filter list"
+              />
+              <TextField
+                label={`Add new ${TYPES.find((item) => item.value === type)?.label.toLowerCase()}`}
+                value={newLabel}
+                onChange={(event) => setNewLabel(event.target.value)}
+                placeholder="e.g., High Protein"
+              />
+              <Button variant="contained" onClick={handleAdd} disabled={!newLabel.trim()}>
+                Add entry
+              </Button>
             </Stack>
           </Paper>
         </Grid>
         <Grid item xs={12} md={8}>
-          <Stack spacing={2}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              {selected ? `Recipes in: ${selected}` : 'Choose a category to view recipes'}
-            </Typography>
-            {selected && (
-              <RecipeGrid
-                recipes={filteredRecipes}
-                onOpenRecipe={handleOpenRecipe}
-                onSaveRecipe={noop}
-                onAddToList={noop}
-              />
-            )}
-            {!selected && (
-              <Typography variant="body2" color="text.secondary">
-                Select a category from the left to see matching recipes.
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3 }}>
+            <Stack spacing={2}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                {items.length} entries
               </Typography>
-            )}
-          </Stack>
+              <List dense>
+                {items.map((item) => (
+                  <ListItem key={item.id} divider>
+                    {editing?.id === item.id ? (
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
+                        <TextField
+                          value={editing.value}
+                          onChange={(event) => setEditing({ ...editing, value: event.target.value })}
+                          size="small"
+                          fullWidth
+                        />
+                        <Button size="small" variant="contained" onClick={handleSaveEdit}>
+                          Save
+                        </Button>
+                        <Button size="small" onClick={() => setEditing(null)}>
+                          Cancel
+                        </Button>
+                      </Stack>
+                    ) : (
+                      <>
+                        <ListItemText primary={item.label} />
+                        <ListItemSecondaryAction>
+                          <Tooltip title="Rename">
+                            <IconButton size="small" onClick={() => setEditing({ id: item.id, value: item.label })}>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Remove">
+                            <span>
+                              <IconButton size="small" onClick={() => handleDelete(item.id)}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </ListItemSecondaryAction>
+                      </>
+                    )}
+                  </ListItem>
+                ))}
+                {!items.length && (
+                  <Typography variant="body2" color="text.secondary">
+                    Nothing to show yet. Add your first entry on the left.
+                  </Typography>
+                )}
+              </List>
+            </Stack>
+          </Paper>
         </Grid>
       </Grid>
+
+      <Snackbar
+        open={Boolean(feedback)}
+        autoHideDuration={3000}
+        onClose={() => setFeedback(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {feedback && (
+          <Alert severity={feedback.severity} variant="filled" sx={{ width: '100%' }} onClose={() => setFeedback(null)}>
+            {feedback.message}
+          </Alert>
+        )}
+      </Snackbar>
     </Stack>
   );
 };
 
 export default CategoriesPage;
-
