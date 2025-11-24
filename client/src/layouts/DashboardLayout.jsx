@@ -17,20 +17,28 @@ import Tooltip from '@mui/material/Tooltip';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import MenuIcon from '@mui/icons-material/Menu';
 import { NavLink } from 'react-router-dom';
-import { useAppState } from '../context/AppStateContext.jsx';
+import { useAppDispatch, useAppState } from '../context/AppStateContext.jsx';
 
 const DashboardLayout = ({ role }) => {
   const navigate = useNavigate();
-  const { user, shoppingList, session } = useAppState();
+  const dispatch = useAppDispatch();
+  const { user, shoppingList, session, admin } = useAppState();
   const [anchorEl, setAnchorEl] = useState(null);
   const [navAnchorEl, setNavAnchorEl] = useState(null);
 
   const shoppingListCount = shoppingList.recipeIds.length;
 
+  const actorProfile = useMemo(() => {
+    if (session.role === 'admin') {
+      return admin.users.find((adminUser) => adminUser.id === session.actorId) || { name: 'Admin' };
+    }
+    return user;
+  }, [session.role, session.actorId, admin.users, user]);
+
   const avatarInitials = useMemo(() => {
-    const [first = '', second = ''] = user.name.split(' ');
+    const [first = '', second = ''] = (actorProfile.name || '').split(' ');
     return `${first.charAt(0)}${second.charAt(0)}`.toUpperCase();
-  }, [user.name]);
+  }, [actorProfile.name]);
 
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -52,6 +60,11 @@ const DashboardLayout = ({ role }) => {
     navigate(path);
     handleNavMenuClose();
     handleProfileMenuClose();
+  };
+
+  const handleSignOut = () => {
+    dispatch({ type: 'SIGN_OUT' });
+    handleNavigate('/auth/login');
   };
 
   const currentRole = role || session.role;
@@ -150,7 +163,7 @@ const DashboardLayout = ({ role }) => {
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleProfileMenuClose}>
         {roleProfileRoute && <MenuItem onClick={() => handleNavigate(roleProfileRoute)}>Profile</MenuItem>}
-        <MenuItem onClick={() => handleNavigate('/auth/login')}>Sign out</MenuItem>
+        <MenuItem onClick={handleSignOut}>Sign out</MenuItem>
       </Menu>
 
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>

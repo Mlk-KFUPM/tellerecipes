@@ -43,7 +43,11 @@ const RegisterPage = () => {
 
   const onSubmit = handleSubmit((values) => {
     console.log("register submit", values);
-    dispatch({ type: "SET_SESSION_ROLE", payload: "user" });
+    dispatch({
+      type: "REGISTER_USER_ACCOUNT",
+      payload: { fullName: values.fullName, email: values.email },
+    });
+    dispatch({ type: "SIGN_IN", payload: { role: "user" } });
     navigate("/app/user");
   });
 

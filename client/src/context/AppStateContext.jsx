@@ -1,14 +1,23 @@
 import { createContext, useContext, useMemo, useReducer } from 'react';
 import PropTypes from 'prop-types';
 import mockRecipes from '../data/mockRecipes.js';
+import { adminUsersSeed, flaggedContentSeed, adminCategoriesSeed } from '../data/mockAdmin.js';
 
 const AppStateContext = createContext();
 const AppDispatchContext = createContext();
 
 const generateId = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+const normalizeUsername = (email, fallback = 'user') => {
+  if (!email) {
+    return fallback;
+  }
+  const candidate = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
+  return candidate || fallback;
+};
 
 const chefProfileSeed = {
   id: 'chef-001',
+  userId: 'user-001',
   name: 'Amina Baker',
   email: 'amina.baker@example.com',
   displayName: 'Chef Amina',
@@ -28,6 +37,7 @@ const chefProfileSeed = {
 const chefRecipesSeed = [
   {
     id: 'recipe-chef-001',
+    ownerId: 'user-001',
     chefId: chefProfileSeed.id,
     title: 'Harissa Roasted Cauliflower Steaks',
     description: 'Charred cauliflower with bright herb yogurt and a crunchy almond-date crumble.',
@@ -109,6 +119,7 @@ const chefRecipesSeed = [
   },
   {
     id: 'recipe-chef-002',
+    ownerId: 'user-001',
     chefId: chefProfileSeed.id,
     title: 'Preserved Lemon Chickpea Tagine',
     description: 'Slow-simmered chickpeas with caramelized onions, saffron broth, and briny preserved lemons.',
@@ -205,10 +216,13 @@ const emptyChefEngagement = {
   recipeStats: {},
 };
 
+const baseRecipes = [...mockRecipes];
+
 const initialState = {
   session: {
-    isAuthenticated: true,
-    role: 'chef',
+    isAuthenticated: false,
+    role: null,
+    actorId: null,
   },
   user: {
     id: 'user-001',
@@ -221,11 +235,17 @@ const initialState = {
       { id: 'collection-002', name: 'Pasta Favourites', recipeIds: ['recipe-002'] },
     ],
   },
-  chefProfile: chefProfileSeed,
-  chefEngagement: chefEngagementSeed,
-  recipes: [...mockRecipes, ...chefRecipesSeed],
+  chefProfile: null,
+  chefEngagement: emptyChefEngagement,
+  recipes: baseRecipes,
   shoppingList: {
     recipeIds: ['recipe-003'],
+  },
+  admin: {
+    users: adminUsersSeed,
+    flaggedContent: flaggedContentSeed,
+    categories: adminCategoriesSeed,
+    actionLog: [],
   },
 };
 
@@ -237,8 +257,152 @@ const calculateAverageRating = (reviews) => {
   return { average: Number((total / reviews.length).toFixed(1)), count: reviews.length };
 };
 
+const buildChefEngagement = (state, recipeSummaries) => {
+  if (!state.chefProfile) {
+    return emptyChefEngagement;
+  }
+  const chefRecipes = recipeSummaries.filter((recipe) => recipe.chefId === state.chefProfile.id);
+  if (!chefRecipes.length) {
+    return emptyChefEngagement;
+  }
+
+  const collectionCounts = new Map();
+  (state.user?.collections || []).forEach((collection) => {
+    collection.recipeIds.forEach((recipeId) => {
+      collectionCounts.set(recipeId, (collectionCounts.get(recipeId) ?? 0) + 1);
+    });
+  });
+  const shoppingSet = new Set(state.shoppingList?.recipeIds || []);
+
+  const recipeStats = {};
+  let totalViews = 0;
+  let totalSaves = 0;
+  let totalRatings = 0;
+  let ratingSum = 0;
+
+  chefRecipes.forEach((recipe) => {
+    const rating = recipe.rating || { average: 0, count: 0 };
+    const saves = collectionCounts.get(recipe.id) ?? 0;
+    const shoppingBump = shoppingSet.has(recipe.id) ? 8 : 0;
+    const views = Math.max(12, rating.count * 18 + saves * 6 + shoppingBump + (recipe.status === 'approved' ? 30 : 15));
+    const comments = (recipe.reviews || []).length;
+    recipeStats[recipe.id] = {
+      views,
+      saves,
+      averageRating: rating.average,
+      ratingsCount: rating.count,
+      comments,
+    };
+    totalViews += views;
+    totalSaves += saves;
+    totalRatings += rating.count;
+    ratingSum += rating.average * rating.count;
+  });
+
+  const totals = {
+    views: totalViews,
+    saves: totalSaves,
+    ratingsCount: totalRatings,
+    averageRating: totalRatings ? Number((ratingSum / totalRatings).toFixed(1)) : 0,
+  };
+
+  return {
+    totals,
+    recipeStats,
+  };
+};
+
+const appendAdminLog = (state, message) => ({
+  ...state,
+  admin: {
+    ...state.admin,
+    actionLog: [
+      {
+        id: generateId('log'),
+        message,
+        timestamp: new Date().toISOString(),
+      },
+      ...state.admin.actionLog,
+    ].slice(0, 25),
+  },
+});
+
 const appReducer = (state, action) => {
   switch (action.type) {
+    case 'SIGN_IN': {
+      const { role, actorId } = action.payload;
+      const isChef = role === 'chef';
+      const hasChefSeeds = state.recipes.some((recipe) => recipe.id === chefRecipesSeed[0].id);
+      const nextRecipes = isChef && !hasChefSeeds ? [...state.recipes, ...chefRecipesSeed] : state.recipes;
+      const nextActorId = actorId ?? state.user.id;
+
+      return {
+        ...state,
+        session: {
+          isAuthenticated: true,
+          role,
+          actorId: nextActorId,
+        },
+        chefProfile: isChef ? state.chefProfile ?? chefProfileSeed : state.chefProfile,
+        chefEngagement: isChef ? state.chefEngagement ?? chefEngagementSeed : state.chefEngagement,
+        recipes: nextRecipes,
+      };
+    }
+    case 'REGISTER_USER_ACCOUNT': {
+      const userId = generateId('user');
+      const username = normalizeUsername(action.payload.email, `user-${userId.slice(-4)}`);
+      const joinedAt = new Date().toISOString();
+      const filteredUsers = state.admin.users.filter(
+        (user) => user.email?.toLowerCase() !== action.payload.email?.toLowerCase(),
+      );
+      const nextAdminUsers = [
+        ...filteredUsers,
+        {
+          id: userId,
+          username,
+          name: action.payload.fullName,
+          role: 'User',
+          status: 'Active',
+          email: action.payload.email,
+          joinedAt,
+        },
+      ];
+      return {
+        ...state,
+        user: {
+          id: userId,
+          name: action.payload.fullName,
+          email: action.payload.email,
+          avatarUrl: null,
+          isEmailVerified: false,
+          collections: [],
+        },
+        shoppingList: {
+          recipeIds: [],
+        },
+        admin: {
+          ...state.admin,
+          users: nextAdminUsers,
+        },
+        session: {
+          ...state.session,
+          actorId: userId,
+        },
+      };
+    }
+    case 'SIGN_OUT': {
+      return {
+        ...state,
+        session: {
+          isAuthenticated: false,
+          role: null,
+          actorId: null,
+        },
+        // keep recipes created during the session so other roles can review them
+        chefProfile: null,
+        chefEngagement: emptyChefEngagement,
+      };
+    }
     case 'UPDATE_PROFILE': {
       return {
         ...state,
@@ -250,7 +414,13 @@ const appReducer = (state, action) => {
       };
     }
     case 'UPDATE_PASSWORD': {
-      return state;
+      return {
+        ...state,
+        user: {
+          ...state.user,
+          passwordUpdatedAt: new Date().toISOString(),
+        },
+      };
     }
     case 'SAVE_RECIPE_TO_COLLECTIONS': {
       const { recipeId, collectionIds } = action.payload;
@@ -326,21 +496,84 @@ const appReducer = (state, action) => {
         recipes: updatedRecipes,
       };
     }
+    case 'SET_RECIPE_STATUS': {
+      const { recipeId, status } = action.payload;
+      const updatedRecipes = state.recipes.map((recipe) =>
+        recipe.id === recipeId ? { ...recipe, status, updatedAt: new Date().toISOString() } : recipe,
+      );
+      return {
+        ...state,
+        recipes: updatedRecipes,
+      };
+    }
+    case 'REMOVE_RECIPE': {
+      const { recipeId } = action.payload;
+      const updatedRecipes = state.recipes.filter((recipe) => recipe.id !== recipeId);
+      const updatedCollections = state.user.collections.map((collection) => ({
+        ...collection,
+        recipeIds: collection.recipeIds.filter((id) => id !== recipeId),
+      }));
+      const recipeStats = state.chefEngagement?.recipeStats || {};
+      const { [recipeId]: _removedStat, ...restStats } = recipeStats;
+      const nextState = {
+        ...state,
+        recipes: updatedRecipes,
+        user: {
+          ...state.user,
+          collections: updatedCollections,
+        },
+        shoppingList: {
+          ...state.shoppingList,
+          recipeIds: state.shoppingList.recipeIds.filter((id) => id !== recipeId),
+        },
+        chefEngagement: state.chefEngagement
+          ? {
+              ...state.chefEngagement,
+              recipeStats: restStats,
+            }
+          : state.chefEngagement,
+      };
+      const removedTitle = state.recipes.find((recipe) => recipe.id === recipeId)?.title || recipeId;
+      return appendAdminLog(nextState, `Removed recipe “${removedTitle}” from the catalog`);
+    }
     case 'SET_SESSION_ROLE': {
+      // Preserve compatibility with existing dispatchers while ensuring authentication is on
       return {
         ...state,
         session: {
-          ...state.session,
+          isAuthenticated: true,
           role: action.payload,
+          actorId: state.session.actorId ?? state.user.id,
         },
       };
     }
     case 'SUBMIT_CHEF_APPLICATION': {
       const applicationId = generateId('chef');
+      const actorId = state.session.actorId ?? state.user.id;
+      const username = normalizeUsername(action.payload.email, `chef-${applicationId.slice(-4)}`);
+      const existingIndex = state.admin.users.findIndex((user) => user.id === actorId);
+      const userEntry = {
+        id: actorId,
+        username,
+        name: action.payload.fullName,
+        role: 'Chef',
+        status: 'Pending',
+        email: action.payload.email,
+        joinedAt: new Date().toISOString(),
+      };
+      const updatedUsers =
+        existingIndex >= 0
+          ? state.admin.users.map((user, index) =>
+              index === existingIndex
+                ? { ...user, name: action.payload.fullName, email: action.payload.email, role: 'Chef', status: 'Pending' }
+                : user,
+            )
+          : [...state.admin.users, userEntry];
       return {
         ...state,
         chefProfile: {
           id: applicationId,
+          userId: actorId,
           name: action.payload.fullName,
           email: action.payload.email,
           displayName: action.payload.displayName || action.payload.fullName,
@@ -356,11 +589,22 @@ const appReducer = (state, action) => {
           submittedAt: new Date().toISOString(),
           approvedAt: null,
         },
+        user: {
+          ...state.user,
+          name: action.payload.fullName,
+          email: action.payload.email,
+        },
+        admin: {
+          ...state.admin,
+          users: updatedUsers,
+        },
         chefEngagement: emptyChefEngagement,
         recipes: state.recipes.filter((recipe) => recipe.chefId !== state.chefProfile?.id),
         session: {
           ...state.session,
+          isAuthenticated: true,
           role: 'chef',
+          actorId,
         },
       };
     }
@@ -397,6 +641,7 @@ const appReducer = (state, action) => {
       const recipeId = generateId('recipe');
       const newRecipe = {
         id: recipeId,
+        ownerId: state.session.actorId ?? state.chefProfile.userId ?? state.user.id,
         chefId: state.chefProfile.id,
         title: action.payload.title,
         description: action.payload.description,
@@ -442,11 +687,10 @@ const appReducer = (state, action) => {
         if (recipe.id !== recipeId) {
           return recipe;
         }
-        const isMajorChange = changeType === 'major' && recipe.status === 'approved';
         return {
           ...recipe,
           ...changes,
-          status: isMajorChange ? 'pending' : recipe.status,
+          status: 'pending',
           updatedAt: new Date().toISOString(),
         };
       });
@@ -484,6 +728,134 @@ const appReducer = (state, action) => {
         recipes: updatedRecipes,
       };
     }
+    case 'ADMIN_UPDATE_USER_STATUS': {
+      const { userId, status } = action.payload;
+      const updatedUsers = state.admin.users.map((user) => (user.id === userId ? { ...user, status } : user));
+      const target = state.admin.users.find((user) => user.id === userId);
+      return appendAdminLog(
+        {
+          ...state,
+          admin: {
+            ...state.admin,
+            users: updatedUsers,
+          },
+        },
+        `Changed status for ${target?.username ?? userId} to ${status}`,
+      );
+    }
+    case 'ADMIN_DELETE_USER': {
+      const { userId } = action.payload;
+      const target = state.admin.users.find((user) => user.id === userId);
+      const updatedUsers = state.admin.users.filter((user) => user.id !== userId);
+      return appendAdminLog(
+        {
+          ...state,
+          admin: {
+            ...state.admin,
+            users: updatedUsers,
+          },
+        },
+        `Deleted user account ${target?.username ?? userId}`,
+      );
+    }
+    case 'ADMIN_UPDATE_USER_ROLE': {
+      const { userId, role } = action.payload;
+      const updatedUsers = state.admin.users.map((user) => (user.id === userId ? { ...user, role } : user));
+      const target = state.admin.users.find((user) => user.id === userId);
+      return appendAdminLog(
+        {
+          ...state,
+          admin: {
+            ...state.admin,
+            users: updatedUsers,
+          },
+        },
+        `Updated ${target?.username ?? userId} role to ${role}`,
+      );
+    }
+    case 'ADMIN_DISMISS_FLAG': {
+      const { flagId } = action.payload;
+      const flag = state.admin.flaggedContent.find((item) => item.id === flagId);
+      const updatedFlags = state.admin.flaggedContent.filter((item) => item.id !== flagId);
+      return appendAdminLog(
+        {
+          ...state,
+          admin: {
+            ...state.admin,
+            flaggedContent: updatedFlags,
+          },
+        },
+        `Dismissed flag on ${flag?.title ?? 'content'}`,
+      );
+    }
+    case 'ADMIN_REMOVE_FLAGGED_ITEM': {
+      const { flagId, removalType } = action.payload;
+      const flag = state.admin.flaggedContent.find((item) => item.id === flagId);
+      const updatedFlags = state.admin.flaggedContent.filter((item) => item.id !== flagId);
+      let nextState = {
+        ...state,
+        admin: {
+          ...state.admin,
+          flaggedContent: updatedFlags,
+        },
+      };
+      if (flag?.type === 'recipe') {
+        nextState = appReducer(nextState, { type: 'REMOVE_RECIPE', payload: { recipeId: flag.referenceId } });
+      }
+      return appendAdminLog(nextState, `Removed ${removalType || 'flagged content'} for ${flag?.title ?? flagId}`);
+    }
+    case 'ADMIN_ADD_CATEGORY': {
+      const { label, type } = action.payload;
+      const newCategory = {
+        id: generateId('category'),
+        label,
+        type,
+      };
+      return appendAdminLog(
+        {
+          ...state,
+          admin: {
+            ...state.admin,
+            categories: [...state.admin.categories, newCategory],
+          },
+        },
+        `Added ${type} “${label}”`,
+      );
+    }
+    case 'ADMIN_UPDATE_CATEGORY': {
+      const { id, label } = action.payload;
+      const updatedCategories = state.admin.categories.map((category) =>
+        category.id === id ? { ...category, label } : category,
+      );
+      return appendAdminLog(
+        {
+          ...state,
+          admin: {
+            ...state.admin,
+            categories: updatedCategories,
+          },
+        },
+        `Renamed category to “${label}”`,
+      );
+    }
+    case 'ADMIN_DELETE_CATEGORY': {
+      const { id } = action.payload;
+      const target = state.admin.categories.find((category) => category.id === id);
+      const updatedCategories = state.admin.categories.filter((category) => category.id !== id);
+      return appendAdminLog(
+        {
+          ...state,
+          admin: {
+            ...state.admin,
+            categories: updatedCategories,
+          },
+        },
+        `Deleted ${target?.type ?? 'category'} “${target?.label ?? id}”`,
+      );
+    }
+    case 'ADMIN_LOG_ACTION': {
+      return appendAdminLog(state, action.payload.message);
+    }
     default:
       return state;
   }
@@ -499,11 +871,13 @@ export const AppStateProvider = ({ children }) => {
     const chefRecipeSummaries = state.chefProfile
       ? recipeSummaries.filter((recipe) => recipe.chefId === state.chefProfile.id)
       : [];
+    const chefEngagement = buildChefEngagement(state, recipeSummaries);
 
     return {
       ...state,
       recipeSummaries,
       chefRecipeSummaries,
+      chefEngagement,
     };
   }, [state]);
 
