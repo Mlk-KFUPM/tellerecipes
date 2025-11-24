@@ -5,16 +5,42 @@ Base URL: `/api`
 Auth uses HTTP-only cookies for refresh tokens and Bearer access tokens. All protected endpoints require a valid access token; admin- and chef-only endpoints additionally enforce role checks.
 
 ## Auth
-- `POST /auth/register` — Create a user account. Body: `{ fullName, email, password }`. Returns user summary + access token.
+
+- `POST /auth/register` — Create a user account. Body: `{ username, email, password }`. Returns user summary + access token.
 - `POST /auth/login` — Sign in with email/password. Body: `{ email, password }`. Returns tokens and role.
 - `POST /auth/logout` — Revoke current refresh session.
-- `POST /auth/refresh` — Rotate access/refresh tokens.
-- `POST /auth/verify-email` — Verify email using one-time code/token. Body: `{ token }`.
-- `POST /auth/resend-verification` — Resend verification email.
-- `POST /auth/forgot-password` — Send reset email. Body: `{ email }`.
-- `POST /auth/reset-password` — Reset with one-time token. Body: `{ token, newPassword }`.
+
+Example: register
+
+Request
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "username": "amina",
+  "email": "amina@example.com",
+  "password": "password123",
+  "role": "user"
+}
+```
+
+Response
+```json
+{
+  "user": {
+    "id": "user-001",
+    "username": "amina",
+    "email": "amina@example.com",
+    "role": "user"
+  },
+  "accessToken": "jwt-access-token",
+  "refreshToken": "httpOnly cookie"
+}
+```
 
 ## User (diner experience)
+
 - `GET /user/profile` — Get current user profile.
 - `PATCH /user/profile` — Update name/email/avatar.
 - `PATCH /user/password` — Change password (requires current password).
@@ -32,7 +58,72 @@ Auth uses HTTP-only cookies for refresh tokens and Bearer access tokens. All pro
 - `POST /recipes/:id/reviews` — Add a review. Body: `{ rating, comment }`.
 - `GET /recipes/:id/reviews` — List reviews for the recipe (paginated).
 
+Example: list recipes with filters
+```http
+GET /api/recipes?search=chicken&cuisine=American&dietary=Gluten%20Free
+```
+Response (200)
+```json
+{
+  "items": [
+    {
+      "id": "recipe-001",
+      "title": "Herb Roasted Chicken with Root Vegetables",
+      "description": "A comforting sheet-pan dinner...",
+      "cuisine": "American",
+      "dietary": ["Gluten Free"],
+      "cookTime": 55,
+      "servings": 4,
+      "image": "https://...",
+      "rating": { "average": 5, "count": 1 }
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "total": 1
+}
+```
+
+Example: add review
+```http
+POST /api/recipes/recipe-001/reviews
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{ "rating": 5, "comment": "Perfect Sunday dinner!" }
+```
+Response (201)
+```json
+{
+  "id": "review-999",
+  "author": "Amina Baker",
+  "rating": 5,
+  "comment": "Perfect Sunday dinner!",
+  "createdAt": "2024-03-12T10:00:00Z"
+}
+```
+
+Example: generate shopping list
+```http
+POST /api/shopping-list
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{ "recipeIds": ["recipe-001", "recipe-003"] }
+```
+Response (200)
+```json
+{
+  "recipeIds": ["recipe-001", "recipe-003"],
+  "consolidatedItems": [
+    { "name": "Garlic cloves", "quantity": 8, "unit": "pcs" },
+    { "name": "Olive oil", "quantity": 3, "unit": "tbsp" }
+  ]
+}
+```
+
 ## Chef (approved chefs)
+
 - `GET /chef/profile` — Get chef profile and status.
 - `POST /chef/apply` — Submit chef application. Body: `{ fullName, email, displayName, bio, specialties[], yearsExperience, signatureDish, phone?, website? }`.
 - `PATCH /chef/profile` — Update approved/pending profile fields.
@@ -43,7 +134,67 @@ Auth uses HTTP-only cookies for refresh tokens and Bearer access tokens. All pro
 - `POST /chef/recipes/:id/replies` — Reply to a review. Body: `{ reviewId, comment }`.
 - `GET /chef/analytics` — Engagement stats (views, saves, ratings) per recipe.
 
+Example: submit chef application
+```http
+POST /api/chef/apply
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "fullName": "Amina Baker",
+  "email": "amina.baker@example.com",
+  "displayName": "Chef Amina",
+  "bio": "North African-inspired chef...",
+  "specialties": ["Moroccan", "Vegetarian Comfort"],
+  "yearsExperience": 9,
+  "signatureDish": "Preserved Lemon & Chickpea Tagine",
+  "phone": "",
+  "website": "https://chefamina.example.com"
+}
+```
+Response (201)
+```json
+{
+  "id": "chef-001",
+  "status": "pending",
+  "submittedAt": "2024-03-12T10:00:00Z"
+}
+```
+
+Example: create recipe
+```http
+POST /api/chef/recipes
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "title": "Harissa Roasted Cauliflower Steaks",
+  "description": "Charred cauliflower with herb yogurt...",
+  "cuisine": "Mediterranean",
+  "dietary": ["Vegetarian", "Gluten Free"],
+  "categories": ["Dinner", "Vegetables"],
+  "prepTime": 15,
+  "cookTime": 30,
+  "servings": 4,
+  "image": "https://...",
+  "gallery": [],
+  "ingredients": [
+    { "name": "Cauliflower heads", "quantity": 2, "unit": "medium" },
+    { "name": "Harissa paste", "quantity": 3, "unit": "tbsp" }
+  ],
+  "steps": [
+    "Heat oven to 425°F.",
+    "Brush harissa on steaks and roast until caramelized."
+  ]
+}
+```
+Response (201)
+```json
+{ "id": "recipe-chef-001", "status": "pending" }
+```
+
 ## Admin
+
 - `GET /admin/dashboard` — Aggregated metrics (recipes, reviews, users, flags, cuisine/dietary counts).
 - `GET /admin/categories?type=category|cuisine|dietary` — List taxonomy entries.
 - `POST /admin/categories` — Add a category/cuisine/dietary. Body: `{ label, type }`.
@@ -60,7 +211,34 @@ Auth uses HTTP-only cookies for refresh tokens and Bearer access tokens. All pro
 - `PATCH /admin/users/:id/role` — Promote/demote (e.g., to/from Chef).
 - `DELETE /admin/users/:id` — Delete user (blocked for self/admin safety).
 
+Example: approve recipe
+```http
+PATCH /api/admin/recipes/recipe-chef-001/status
+Content-Type: application/json
+Authorization: Bearer <admin token>
+
+{ "status": "approved", "note": "Looks great." }
+```
+Response (200)
+```json
+{ "id": "recipe-chef-001", "status": "approved", "approvedAt": "2024-03-12T10:00:00Z" }
+```
+
+Example: manage categories
+```http
+POST /api/admin/categories
+Content-Type: application/json
+Authorization: Bearer <admin token>
+
+{ "label": "Weeknight Dinner", "type": "category" }
+```
+Response (201)
+```json
+{ "id": "cat-123", "label": "Weeknight Dinner", "type": "category" }
+```
+
 ## Notes derived from frontend
+
 - Frontend uses filters for cuisines/dietary/categories; provide them via `/admin/categories` (for admins) and `/recipes` filter metadata for diners.
 - Chef flow: apply -> pending -> approved; approved chefs can create/update recipes; major updates trigger re-review.
 - Admin panels cover recipe moderation, flagged content (recipes/reviews), user management, and taxonomy configuration.

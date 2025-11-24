@@ -2,7 +2,6 @@ const { Schema, model } = require("mongoose");
 
 const userSchema = new Schema(
   {
-    fullName: { type: String, required: true, trim: true },
     username: {
       type: String,
       required: true,
@@ -24,14 +23,6 @@ const userSchema = new Schema(
       enum: ["active", "pending", "deactivated"],
       default: "active",
     },
-    avatarUrl: { type: String, default: null },
-    isEmailVerified: { type: Boolean, default: false },
-    emailVerifiedAt: { type: Date, default: null },
-    passwordUpdatedAt: { type: Date, default: null },
-    termsAcceptedAt: { type: Date, default: null },
-    lastLoginAt: { type: Date, default: null },
-    onboardingCompleted: { type: Boolean, default: false },
-    flags: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
