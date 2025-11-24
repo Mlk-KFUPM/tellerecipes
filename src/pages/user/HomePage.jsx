@@ -38,7 +38,7 @@ const HomePage = () => {
   }, [recipeSummaries, searchTerm, selectedCuisine, selectedDietary]);
 
   const handleOpenRecipe = (recipe) => {
-    navigate(`/app/recipes/${recipe.id}`);
+    navigate(`/app/user/recipes/${recipe.id}`);
   };
 
   const handleOpenCollections = (recipe) => {

@@ -14,6 +14,11 @@ Welcome to the TellerRecipes front-end workspace. This guide explains how the pr
    ```
 3. Visit the URL shown in the terminal (defaults to http://localhost:5173).
 
+### Testing different roles
+
+- Use the "Sign in as" select on the login screen to impersonate a Registered User, Chef, or Admin during development.
+- After registration the app defaults to the Registered User workflow; switch roles on the login form when you need to test other experiences.
+
 ## Project Structure
 
 ```
@@ -44,17 +49,25 @@ src/
 ## Working by Role
 
 ### Registered User (current implementation)
+
+- Entry point: `/app/user`
 - Pages live under `src/pages/user/`
 - Shared user-specific components reside in `src/components/recipes`, `src/components/collections`, and `src/components/shopping`
 - App state and mock data live in `src/context/AppStateContext.jsx` and `src/data/mockRecipes.js`
 
 ### Chef Experience
-- Create Chef-specific pages in `src/pages/chef/` (e.g., `DashboardPage.jsx`, `RecipeEditorPage.jsx`)
+
+- Entry point: `/app/chef` (nav link appears after logging in as a Chef via the login role selector)
+- Initial scaffold lives at `src/pages/chef/ChefDashboardPage.jsx`
+- Create additional Chef views under `src/pages/chef/` (e.g., `RecipeEditorPage.jsx`)
 - Chef-specific shared components (recipe editor forms, analytics, etc.) can live in a new folder `src/components/chef/`
 - Use existing form primitives from `src/components/forms/` when possible
 - If chefs require extra context (e.g., list of their recipes), extend `AppStateContext` with the necessary state/actions
 
 ### Admin Experience
+
+- Entry point: `/app/admin` (nav link appears after logging in as an Admin via the login role selector)
+- Initial scaffold lives at `src/pages/admin/AdminDashboardPage.jsx`
 - Add Admin pages under `src/pages/admin/` (e.g., `UserManagementPage.jsx`, `ContentModerationPage.jsx`)
 - Reusable admin widgets should go in `src/components/admin/`
 - Hook into the same global context or add new selectors/actions for moderation workflows
@@ -65,9 +78,13 @@ Declare new role-specific routes in `src/App.jsx` under the protected `/app` tre
 
 ```jsx
 <Route element={<ProtectedRoute />}>
-  <Route path="/app" element={<DashboardLayout />}>
-    <Route path="chef" element={<ChefDashboardPage />} />
-    <Route path="admin" element={<AdminOverviewPage />} />
+  <Route path="/app/user" element={<DashboardLayout role="user" />}>
+    <Route index element={<HomePage />} />
+  </Route>
+  <Route element={<RoleRoute allowedRoles={["chef"]} redirectTo="/app/user" />}>
+    <Route path="/app/chef" element={<DashboardLayout role="chef" />}>
+      <Route index element={<ChefDashboardPage />} />
+    </Route>
   </Route>
 </Route>
 ```
