@@ -23,6 +23,7 @@ const userSchema = new Schema(
       enum: ["active", "pending", "deactivated"],
       default: "active",
     },
+    avatarUrl: { type: String, default: "" },
   },
   { timestamps: true }
 );
