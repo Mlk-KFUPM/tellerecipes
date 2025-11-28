@@ -12,10 +12,7 @@ const connectDB = async (uri = process.env.MONGODB_URI) => {
   }
 
   try {
-    cachedConnection = await mongoose.connect(uri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    cachedConnection = await mongoose.connect(uri);
     return cachedConnection;
   } catch (error) {
     cachedConnection = null;

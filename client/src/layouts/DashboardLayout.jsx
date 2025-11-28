@@ -18,10 +18,12 @@ import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import MenuIcon from '@mui/icons-material/Menu';
 import { NavLink } from 'react-router-dom';
 import { useAppDispatch, useAppState } from '../context/AppStateContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const DashboardLayout = ({ role }) => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { user: authUser, role: authRole, logout } = useAuth();
   const { user, shoppingList, session, admin } = useAppState();
   const [anchorEl, setAnchorEl] = useState(null);
   const [navAnchorEl, setNavAnchorEl] = useState(null);
@@ -29,16 +31,18 @@ const DashboardLayout = ({ role }) => {
   const shoppingListCount = shoppingList.recipeIds.length;
 
   const actorProfile = useMemo(() => {
+    if (authUser) return authUser;
     if (session.role === 'admin') {
       return admin.users.find((adminUser) => adminUser.id === session.actorId) || { name: 'Admin' };
     }
     return user;
-  }, [session.role, session.actorId, admin.users, user]);
+  }, [authUser, session.role, session.actorId, admin.users, user]);
 
   const avatarInitials = useMemo(() => {
-    const [first = '', second = ''] = (actorProfile.name || '').split(' ');
+    const displayName = actorProfile.name || actorProfile.username || actorProfile.email || '';
+    const [first = '', second = ''] = displayName.split(' ');
     return `${first.charAt(0)}${second.charAt(0)}`.toUpperCase();
-  }, [actorProfile.name]);
+  }, [actorProfile.name, actorProfile.username, actorProfile.email]);
 
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -62,12 +66,13 @@ const DashboardLayout = ({ role }) => {
     handleProfileMenuClose();
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     dispatch({ type: 'SIGN_OUT' });
+    await logout();
     handleNavigate('/auth/login');
   };
 
-  const currentRole = role || session.role;
+  const currentRole = role || authRole || session.role;
 
   const navItems = useMemo(() => {
     if (currentRole === 'chef') {

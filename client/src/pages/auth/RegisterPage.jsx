@@ -13,11 +13,11 @@ import AuthHeader from "../../components/auth/AuthHeader.jsx";
 import ControlledTextField from "../../components/forms/ControlledTextField.jsx";
 import PasswordField from "../../components/forms/PasswordField.jsx";
 import AuthRedirectPrompt from "../../components/auth/AuthRedirectPrompt.jsx";
-import { useAppDispatch } from "../../context/AppStateContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
+  const { register: registerUser } = useAuth();
   const schema = useMemo(
     () =>
       z.object({
@@ -42,13 +42,15 @@ const RegisterPage = () => {
   });
 
   const onSubmit = handleSubmit((values) => {
-    console.log("register submit", values);
-    dispatch({
-      type: "REGISTER_USER_ACCOUNT",
-      payload: { fullName: values.fullName, email: values.email },
+    registerUser({
+      username: values.fullName,
+      email: values.email,
+      password: values.password,
+    }).then((user) => {
+      const nextRoute =
+        user.role === "chef" ? "/app/chef" : user.role === "admin" ? "/app/admin" : "/app/user";
+      navigate(nextRoute);
     });
-    dispatch({ type: "SIGN_IN", payload: { role: "user" } });
-    navigate("/app/user");
   });
 
   return (

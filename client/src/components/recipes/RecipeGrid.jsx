@@ -3,7 +3,15 @@ import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import RecipeCard from './RecipeCard.jsx';
 
-const RecipeGrid = ({ recipes, onOpenRecipe, onSaveRecipe, onAddToList }) => {
+const RecipeGrid = ({ recipes, onOpenRecipe, onSaveRecipe, onAddToList, loading }) => {
+  if (loading) {
+    return (
+      <Typography variant="body1" color="text.secondary" sx={{ mt: 4 }}>
+        Loading recipes...
+      </Typography>
+    );
+  }
+
   if (!recipes.length) {
     return (
       <Typography variant="body1" color="text.secondary" sx={{ mt: 4 }}>
@@ -28,6 +36,11 @@ RecipeGrid.propTypes = {
   onOpenRecipe: PropTypes.func.isRequired,
   onSaveRecipe: PropTypes.func.isRequired,
   onAddToList: PropTypes.func.isRequired,
+  loading: PropTypes.bool,
+};
+
+RecipeGrid.defaultProps = {
+  loading: false,
 };
 
 export default RecipeGrid;

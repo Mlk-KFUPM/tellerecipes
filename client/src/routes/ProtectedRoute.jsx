@@ -1,12 +1,12 @@
 import PropTypes from 'prop-types';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAppState } from '../context/AppStateContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const ProtectedRoute = ({ redirectTo }) => {
-  const { session } = useAppState();
+  const { isAuthenticated } = useAuth();
   const location = useLocation();
 
-  if (!session.isAuthenticated) {
+  if (!isAuthenticated) {
     return <Navigate to={redirectTo} replace state={{ from: location }} />;
   }
 

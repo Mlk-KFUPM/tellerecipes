@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -10,19 +10,26 @@ import RecipeDetail from "../../components/recipes/RecipeDetail.jsx";
 import ReviewList from "../../components/recipes/ReviewList.jsx";
 import ReviewForm from "../../components/recipes/ReviewForm.jsx";
 import CollectionSelectorDialog from "../../components/collections/CollectionSelectorDialog.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import {
-  useAppDispatch,
-  useAppState,
-  selectRecipeById,
-} from "../../context/AppStateContext.jsx";
+  addReview,
+  createCollection,
+  getRecipe,
+  listCollections,
+  listReviews,
+  toggleSaveRecipe,
+  updateShoppingList,
+} from "../../api/user.js";
 
 const RecipeDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const state = useAppState();
-  const dispatch = useAppDispatch();
+  const { token, user } = useAuth();
 
-  const recipe = useMemo(() => selectRecipeById(state, id), [state, id]);
+  const [recipe, setRecipe] = useState(null);
+  const [collections, setCollections] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [collectionDialog, setCollectionDialog] = useState({
     open: false,
@@ -34,56 +41,111 @@ const RecipeDetailPage = () => {
     severity: "success",
   });
 
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [recipeRes, reviewRes] = await Promise.all([getRecipe(id), listReviews(id)]);
+        const mappedRecipe = {
+          ...recipeRes,
+          id: recipeRes._id || recipeRes.id,
+          dietary: recipeRes.dietary || [],
+          ingredients: recipeRes.ingredients || [],
+        };
+        setRecipe(mappedRecipe);
+        setReviews(reviewRes.items || []);
+        if (token) {
+          const collectionRes = await listCollections(token);
+          const mappedCollections = (collectionRes.items || collectionRes || []).map((c) => ({
+            ...c,
+            id: c._id || c.id,
+            recipeIds: (c.recipeIds || []).map((rid) => rid.toString()),
+          }));
+          setCollections(mappedCollections);
+        }
+      } catch (err) {
+        console.error("Failed to load recipe", err);
+        setFeedback({ open: true, message: err.message || "Failed to load recipe", severity: "error" });
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [id, token]);
+
   if (!recipe) {
     return (
       <Stack spacing={2} alignItems="flex-start">
-        <Typography variant="h5">Recipe not found</Typography>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(-1)}
-        >
+        <Typography variant="h5">{loading ? "Loading recipe..." : "Recipe not found"}</Typography>
+        <Button variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)}>
           Go back
         </Button>
       </Stack>
     );
   }
 
-  const defaultSelectedCollections = state.user.collections
+  const defaultSelectedCollections = collections
     .filter((collection) => collection.recipeIds.includes(recipe.id))
     .map((collection) => collection.id);
 
   const handleAddToShoppingList = (targetRecipe) => {
-    dispatch({
-      type: "ADD_RECIPE_TO_SHOPPING_LIST",
-      payload: { recipeId: targetRecipe.id },
-    });
-    setFeedback({
-      open: true,
-      message: `${targetRecipe.title} added to your shopping list`,
-      severity: "success",
-    });
+    if (!token) {
+      setFeedback({
+        open: true,
+        message: "Please sign in to manage your shopping list",
+        severity: "info",
+      });
+      return;
+    }
+    updateShoppingList(token, [targetRecipe.id])
+      .then(() => {
+        setFeedback({
+          open: true,
+          message: `${targetRecipe.title} added to your shopping list`,
+          severity: "success",
+        });
+      })
+      .catch((err) =>
+        setFeedback({
+          open: true,
+          message: err.message || "Failed to update shopping list",
+          severity: "error",
+        }),
+      );
   };
 
   const handleOpenCollections = (targetRecipe) => {
     setCollectionDialog({ open: true, recipe: targetRecipe });
   };
 
-  const handleSaveToCollections = ({ selectedIds, newCollection }) => {
+  const handleSaveToCollections = async ({ selectedIds, newCollection }) => {
     const recipeId = recipe.id;
     let collectionIds = selectedIds;
-    if (newCollection) {
-      const idValue = `collection-${Date.now()}`;
-      dispatch({
-        type: "CREATE_COLLECTION",
-        payload: { id: idValue, name: newCollection, recipeIds: [recipeId] },
+    if (!token) {
+      setFeedback({
+        open: true,
+        message: "Please sign in to save recipes",
+        severity: "info",
       });
-      collectionIds = [...selectedIds, idValue];
+      return;
     }
-    dispatch({
-      type: "SAVE_RECIPE_TO_COLLECTIONS",
-      payload: { recipeId, collectionIds },
-    });
+
+    if (newCollection) {
+      const created = await createCollection(token, { name: newCollection });
+      const mapped = {
+        ...created,
+        id: created._id || created.id,
+        recipeIds: [],
+      };
+      setCollections((prev) => [...prev, mapped]);
+      collectionIds = [...selectedIds, mapped.id];
+    }
+    const res = await toggleSaveRecipe(token, recipeId, { collectionIds });
+    const updated = (res.collections || []).map((c) => ({
+      ...c,
+      id: c._id || c.id,
+      recipeIds: (c.recipeIds || []).map((rid) => rid.toString()),
+    }));
+    setCollections(updated);
     setFeedback({
       open: true,
       message: `${recipe.title} saved to your collections`,
@@ -93,28 +155,49 @@ const RecipeDetailPage = () => {
   };
 
   const handleCreateCollection = async (name) => {
-    const idValue = `collection-${Date.now()}`;
-    dispatch({
-      type: "CREATE_COLLECTION",
-      payload: { id: idValue, name, recipeIds: [] },
-    });
-    return idValue;
+    if (!token) {
+      setFeedback({
+        open: true,
+        message: "Please sign in to save recipes",
+        severity: "info",
+      });
+      return null;
+    }
+    const created = await createCollection(token, { name });
+    const mapped = {
+      ...created,
+      id: created._id || created.id,
+      recipeIds: [],
+    };
+    setCollections((prev) => [...prev, mapped]);
+    return mapped.id;
   };
 
   const handleSubmitReview = ({ rating, comment }) => {
-    const review = {
-      id: `review-${Date.now()}`,
-      author: state.user.name,
-      rating,
-      comment,
-      createdAt: new Date().toISOString(),
-    };
-    dispatch({ type: "ADD_REVIEW", payload: { recipeId: recipe.id, review } });
-    setFeedback({
-      open: true,
-      message: "Thank you for reviewing this recipe!",
-      severity: "success",
-    });
+    if (!token) {
+      setFeedback({
+        open: true,
+        message: "Please sign in to leave a review",
+        severity: "info",
+      });
+      return;
+    }
+    addReview(token, recipe.id, { rating, comment })
+      .then((res) => {
+        setReviews((prev) => [...prev, res]);
+        setFeedback({
+          open: true,
+          message: "Thank you for reviewing this recipe!",
+          severity: "success",
+        });
+      })
+      .catch((err) =>
+        setFeedback({
+          open: true,
+          message: err.message || "Failed to submit review",
+          severity: "error",
+        }),
+      );
   };
 
   return (
@@ -128,22 +211,18 @@ const RecipeDetailPage = () => {
         Back to recipes
       </Button>
 
-      <RecipeDetail
-        recipe={recipe}
-        onSave={handleOpenCollections}
-        onAddToList={handleAddToShoppingList}
-      />
+      <RecipeDetail recipe={recipe} onSave={handleOpenCollections} onAddToList={handleAddToShoppingList} />
 
       <Stack spacing={4}>
         <Typography variant="h5">Community reviews</Typography>
-        <ReviewList reviews={recipe.reviews} />
+        <ReviewList reviews={reviews} />
         <ReviewForm onSubmit={handleSubmitReview} />
       </Stack>
 
       <CollectionSelectorDialog
         open={collectionDialog.open}
         onClose={() => setCollectionDialog({ open: false, recipe: null })}
-        collections={state.user.collections}
+        collections={collections}
         defaultSelected={defaultSelectedCollections}
         onSave={handleSaveToCollections}
         onCreateCollection={handleCreateCollection}
@@ -155,11 +234,7 @@ const RecipeDetailPage = () => {
         onClose={() => setFeedback((prev) => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert
-          severity={feedback.severity}
-          variant="filled"
-          sx={{ width: "100%" }}
-        >
+        <Alert severity={feedback.severity} variant="filled" sx={{ width: "100%" }}>
           {feedback.message}
         </Alert>
       </Snackbar>
