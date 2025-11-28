@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';

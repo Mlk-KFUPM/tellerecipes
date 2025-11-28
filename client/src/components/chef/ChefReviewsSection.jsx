@@ -9,10 +9,8 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import dayjs from 'dayjs';
-import { useAppDispatch } from '../../context/AppStateContext.jsx';
 
-const ChefReviewsSection = ({ recipes, chefName }) => {
-  const dispatch = useAppDispatch();
+const ChefReviewsSection = ({ recipes, chefName, onReply }) => {
   const [drafts, setDrafts] = useState({});
 
   const recipesWithReviews = useMemo(
@@ -29,17 +27,7 @@ const ChefReviewsSection = ({ recipes, chefName }) => {
     if (!draft) {
       return;
     }
-    dispatch({
-      type: 'ADD_REVIEW_REPLY',
-      payload: {
-        recipeId,
-        reviewId,
-        reply: {
-          author: chefName,
-          comment: draft,
-        },
-      },
-    });
+    onReply(recipeId, reviewId, draft, chefName);
     setDrafts((prev) => ({ ...prev, [reviewId]: '' }));
   };
 
@@ -158,11 +146,13 @@ ChefReviewsSection.propTypes = {
     }),
   ),
   chefName: PropTypes.string,
+  onReply: PropTypes.func,
 };
 
 ChefReviewsSection.defaultProps = {
   recipes: [],
   chefName: 'Chef',
+  onReply: () => {},
 };
 
 export default ChefReviewsSection;
