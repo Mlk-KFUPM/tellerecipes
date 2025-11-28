@@ -17,26 +17,38 @@ import Tooltip from '@mui/material/Tooltip';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import MenuIcon from '@mui/icons-material/Menu';
 import { NavLink } from 'react-router-dom';
-import { useAppDispatch, useAppState } from '../context/AppStateContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { getShoppingList } from '../api/user.js';
 
 const DashboardLayout = ({ role }) => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const { user: authUser, role: authRole, logout } = useAuth();
-  const { user, shoppingList, session, admin } = useAppState();
+  const { user: authUser, role: authRole, token, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const [navAnchorEl, setNavAnchorEl] = useState(null);
+  const [shoppingListCount, setShoppingListCount] = useState(0);
 
-  const shoppingListCount = shoppingList.recipeIds.length;
-
-  const actorProfile = useMemo(() => {
-    if (authUser) return authUser;
-    if (session.role === 'admin') {
-      return admin.users.find((adminUser) => adminUser.id === session.actorId) || { name: 'Admin' };
+  useEffect(() => {
+    let isMounted = true;
+    if (!authUser) {
+      setShoppingListCount(0);
+      return;
     }
-    return user;
-  }, [authUser, session.role, session.actorId, admin.users, user]);
+    (async () => {
+      try {
+        const list = await getShoppingList(token);
+        if (isMounted) {
+          setShoppingListCount((list?.recipeIds || []).length);
+        }
+      } catch (err) {
+        // non-blocking
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser, token]);
+
+  const actorProfile = useMemo(() => authUser || {}, [authUser]);
 
   const avatarInitials = useMemo(() => {
     const displayName = actorProfile.name || actorProfile.username || actorProfile.email || '';
@@ -67,12 +79,11 @@ const DashboardLayout = ({ role }) => {
   };
 
   const handleSignOut = async () => {
-    dispatch({ type: 'SIGN_OUT' });
     await logout();
     handleNavigate('/auth/login');
   };
 
-  const currentRole = role || authRole || session.role;
+  const currentRole = role || authRole;
 
   const navItems = useMemo(() => {
     if (currentRole === 'chef') {

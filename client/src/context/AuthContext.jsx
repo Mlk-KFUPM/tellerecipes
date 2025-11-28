@@ -33,6 +33,13 @@ export const AuthProvider = ({ children }) => {
     bootstrap();
   }, [token]);
 
+  const refreshProfile = useCallback(async () => {
+    if (!token) return null;
+    const profile = await fetchProfile(token);
+    setUser(profile.user);
+    return profile.user;
+  }, [token]);
+
   const login = useCallback(async (credentials) => {
     setError(null);
     setStatus('loading');
@@ -79,10 +86,12 @@ export const AuthProvider = ({ children }) => {
       login,
       register,
       logout,
+      setUser,
+      refreshProfile,
       isAuthenticated: status === 'authenticated',
       role: user?.role || null,
     }),
-    [user, token, status, error, login, register, logout],
+    [user, token, status, error, login, register, logout, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
