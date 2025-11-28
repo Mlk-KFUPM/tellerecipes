@@ -1,46 +1,38 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');
 const { connectDB } = require('./db');
-
-const authRouter = require('./routes/auth.route');
-const userRouter = require('./routes/user.route');
-const chefRouter = require('./routes/chef.route');
-const adminRouter = require('./routes/admin.route');
 
 const app = express();
 
-const parseOrigins = (value) => {
-  if (!value) return ['*'];
-  return value.split(',').map((v) => v.trim()).filter(Boolean);
+app.use(cors());
+app.use(express.json());
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`Server listening on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server', error);
+    process.exit(1);
+  }
 };
 
-app.use(
-  cors({
-    origin: parseOrigins(process.env.CORS_ORIGIN || process.env.CORS_ORIGINS),
-    credentials: true,
-  }),
-);
-app.use(express.json({ limit: '1mb' }));
-app.use(cookieParser());
+if (require.main === module) {
+  startServer();
+}
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+module.exports = { app, startServer };
 
-app.use('/api/auth', authRouter);
-app.use('/api/user', userRouter);
-app.use('/api/chef', chefRouter);
-app.use('/api/admin', adminRouter);
-
-const port = process.env.PORT || 4000;
-
-connectDB()
-  .then(() => {
-    app.listen(port, () => {
-      console.log(`API server running on port ${port}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Failed to connect to MongoDB', err);
-    process.exit(1);
-  });

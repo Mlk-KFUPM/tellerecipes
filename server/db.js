@@ -1,11 +1,38 @@
 const mongoose = require('mongoose');
 
-const connectDB = async (uri) => {
-  const mongoUri = uri || process.env.MONGODB_URI || 'mongodb://localhost:27017/tellerecipes';
-  await mongoose.connect(mongoUri, {
-    autoIndex: true,
-  });
-  return mongoose.connection;
+let cachedConnection = null;
+
+const connectDB = async (uri = process.env.MONGODB_URI) => {
+  if (!uri) {
+    throw new Error('MONGODB_URI is not set');
+  }
+
+  if (cachedConnection) {
+    return cachedConnection;
+  }
+
+  try {
+    cachedConnection = await mongoose.connect(uri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    return cachedConnection;
+  } catch (error) {
+    cachedConnection = null;
+    throw error;
+  }
 };
 
-module.exports = { connectDB };
+const disconnectDB = async () => {
+  if (!cachedConnection) {
+    return;
+  }
+
+  await mongoose.connection.close();
+  cachedConnection = null;
+};
+
+module.exports = {
+  connectDB,
+  disconnectDB,
+};
