@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
@@ -20,34 +20,58 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import Divider from '@mui/material/Divider';
-import { useAppDispatch, useAppState } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import {
+  listUsers,
+  updateUserRole,
+  updateUserStatus,
+  deleteUser,
+} from '../../api/admin.js';
 
 const roleFilters = [
   { label: 'All roles', value: 'all' },
-  { label: 'Admins', value: 'Admin' },
-  { label: 'Chefs', value: 'Chef' },
-  { label: 'Users', value: 'User' },
+  { label: 'Admins', value: 'admin' },
+  { label: 'Chefs', value: 'chef' },
+  { label: 'Users', value: 'user' },
 ];
 
 const UserManagementPage = () => {
-  const dispatch = useAppDispatch();
-  const { admin, session } = useAppState();
+  const { token, user: authUser } = useAuth();
+  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await listUsers(token);
+        const mapped = (res.items || res || []).map((u) => ({ ...u, id: u._id || u.id }));
+        setUsers(mapped);
+      } catch (err) {
+        console.error('Failed to load users', err);
+        setFeedback({ severity: 'error', message: err.message || 'Failed to load users' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [token]);
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return admin.users.filter((user) => {
+    return users.filter((user) => {
       const matchesRole = roleFilter === 'all' ? true : user.role === roleFilter;
       const matchesSearch = term
         ? user.username.toLowerCase().includes(term) || user.email.toLowerCase().includes(term)
         : true;
       return matchesRole && matchesSearch;
     });
-  }, [admin.users, search, roleFilter]);
+  }, [users, search, roleFilter]);
 
   const openConfirm = (action, user) => {
     setConfirm({ action, user });
@@ -56,26 +80,40 @@ const UserManagementPage = () => {
   const handleAction = () => {
     if (!confirm) return;
     const { action, user } = confirm;
-    if (action === 'deactivate') {
-      dispatch({ type: 'ADMIN_UPDATE_USER_STATUS', payload: { userId: user.id, status: 'Deactivated' } });
-      setFeedback({ severity: 'info', message: `${user.username} deactivated.` });
-    } else if (action === 'activate') {
-      dispatch({ type: 'ADMIN_UPDATE_USER_STATUS', payload: { userId: user.id, status: 'Active' } });
-      setFeedback({ severity: 'success', message: `${user.username} reactivated.` });
-    } else if (action === 'delete') {
-      dispatch({ type: 'ADMIN_DELETE_USER', payload: { userId: user.id } });
-      setFeedback({ severity: 'warning', message: `${user.username} deleted.` });
-    } else if (action === 'revoke') {
-      dispatch({ type: 'ADMIN_UPDATE_USER_ROLE', payload: { userId: user.id, role: 'User' } });
-      setFeedback({ severity: 'info', message: `${user.username} downgraded to User.` });
-    } else if (action === 'promote') {
-      dispatch({ type: 'ADMIN_UPDATE_USER_ROLE', payload: { userId: user.id, role: 'Chef' } });
-      setFeedback({ severity: 'success', message: `${user.username} is now a Chef.` });
-    }
-    setConfirm(null);
+    const run = async () => {
+      try {
+        if (action === 'deactivate') {
+          const updated = await updateUserStatus(token, user.id, 'deactivated');
+          setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...updated, id: updated._id || updated.id } : u)));
+          setFeedback({ severity: 'info', message: `${user.username} deactivated.` });
+        } else if (action === 'activate') {
+          const updated = await updateUserStatus(token, user.id, 'active');
+          setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...updated, id: updated._id || updated.id } : u)));
+          setFeedback({ severity: 'success', message: `${user.username} reactivated.` });
+        } else if (action === 'delete') {
+          await deleteUser(token, user.id);
+          setUsers((prev) => prev.filter((u) => u.id !== user.id));
+          setFeedback({ severity: 'warning', message: `${user.username} deleted.` });
+        } else if (action === 'revoke') {
+          const updated = await updateUserRole(token, user.id, 'user');
+          setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...updated, id: updated._id || updated.id } : u)));
+          setFeedback({ severity: 'info', message: `${user.username} downgraded to User.` });
+        } else if (action === 'promote') {
+          const updated = await updateUserRole(token, user.id, 'chef');
+          setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...updated, id: updated._id || updated.id } : u)));
+          setFeedback({ severity: 'success', message: `${user.username} is now a Chef.` });
+        }
+      } catch (err) {
+        console.error('User action failed', err);
+        setFeedback({ severity: 'error', message: err.message || 'Action failed' });
+      } finally {
+        setConfirm(null);
+      }
+    };
+    run();
   };
 
-  const isSelf = (user) => user.id === session.actorId;
+  const isSelf = (user) => authUser && user.id === (authUser.id || authUser._id);
 
   return (
     <Stack spacing={4}>
@@ -123,24 +161,38 @@ const UserManagementPage = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredUsers.map((user) => (
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <Typography variant="body2" color="text.secondary">
+                    Loading users...
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+            {!loading &&
+              filteredUsers.map((user) => (
               <TableRow key={user.id} hover onClick={() => setSelectedUser(user)} sx={{ cursor: 'pointer' }}>
                 <TableCell>{user.username}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
-                  <Chip label={user.role} size="small" color={user.role === 'Chef' ? 'primary' : 'default'} />
+                  <Chip
+                    label={(user.role || '').charAt(0).toUpperCase() + (user.role || '').slice(1)}
+                    size="small"
+                    color={user.role === 'chef' ? 'primary' : user.role === 'admin' ? 'secondary' : 'default'}
+                  />
                 </TableCell>
                 <TableCell>
                   <Chip
-                    label={user.status}
+                    label={(user.status || '').charAt(0).toUpperCase() + (user.status || '').slice(1)}
                     size="small"
-                    color={user.status === 'Active' ? 'success' : 'default'}
-                    variant={user.status === 'Active' ? 'filled' : 'outlined'}
+                    color={user.status === 'active' ? 'success' : 'default'}
+                    variant={user.status === 'active' ? 'filled' : 'outlined'}
                   />
                 </TableCell>
                 <TableCell align="right">
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
-                    {user.role === 'User' && user.status === 'Active' && (
+                    {user.role === 'user' && user.status === 'active' && (
                       <Button
                         size="small"
                         variant="outlined"
@@ -152,7 +204,7 @@ const UserManagementPage = () => {
                         Promote to Chef
                       </Button>
                     )}
-                    {user.role === 'Chef' && (
+                    {user.role === 'chef' && (
                       <Button
                         size="small"
                         variant="outlined"
@@ -164,7 +216,7 @@ const UserManagementPage = () => {
                         Revoke Chef role
                       </Button>
                     )}
-                    {user.status === 'Active' ? (
+                    {user.status === 'active' ? (
                       <Button
                         size="small"
                         variant="outlined"
@@ -191,7 +243,7 @@ const UserManagementPage = () => {
                       size="small"
                       color="error"
                       variant="contained"
-                      disabled={user.role === 'Admin' || isSelf(user)}
+                      disabled={user.role === 'admin' || isSelf(user)}
                       onClick={(event) => {
                         event.stopPropagation();
                         openConfirm('delete', user);
@@ -239,7 +291,8 @@ const UserManagementPage = () => {
               <strong>Status:</strong> {selectedUser.status}
             </Typography>
             <Typography variant="body2">
-              <strong>Joined:</strong> {new Date(selectedUser.joinedAt).toLocaleDateString()}
+              <strong>Joined:</strong>{' '}
+              {selectedUser.joinedAt ? new Date(selectedUser.joinedAt).toLocaleDateString() : '—'}
             </Typography>
           </Stack>
         </Paper>

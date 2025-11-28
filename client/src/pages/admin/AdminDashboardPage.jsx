@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
@@ -15,7 +15,10 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
-import { useAppState, selectFilters } from '../../context/AppStateContext.jsx';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { fetchDashboard, listRecipes } from '../../api/admin.js';
 
 const StatCard = ({ label, value }) => (
   <Paper elevation={0} sx={{ p: 3, borderRadius: 3 }}>
@@ -35,40 +38,74 @@ const rangeOptions = [
 ];
 
 const AdminDashboardPage = () => {
-  const state = useAppState();
-  const { cuisines, dietary } = selectFilters(state);
+  const { token } = useAuth();
   const [selectedRange, setSelectedRange] = useState('30d');
+  const [metrics, setMetrics] = useState(null);
+  const [recentRecipes, setRecentRecipes] = useState([]);
+  const [allRecipes, setAllRecipes] = useState([]);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [dashRes, recipesRes] = await Promise.all([
+          fetchDashboard(token),
+          listRecipes(token, { status: 'approved' }),
+        ]);
+        setMetrics(dashRes);
+        const mappedRecipes = (recipesRes.items || []).map((r) => ({
+          id: r._id || r.id,
+          title: r.title,
+          cuisine: r.cuisine,
+          dietary: r.dietary || [],
+          reviews: r.reviews || [],
+          createdAt: r.createdAt,
+        }));
+        setAllRecipes(mappedRecipes);
+        setRecentRecipes(mappedRecipes.slice(-5));
+        setError(null);
+      } catch (err) {
+        console.error('Dashboard load failed', err);
+        setError(err.message || 'Failed to load dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [token]);
 
   const stats = useMemo(() => {
-    const { admin, recipes } = state;
+    if (!metrics) {
+      return null;
+    }
     const rangeMeta = rangeOptions.find((range) => range.value === selectedRange) ?? rangeOptions[1];
-    const now = Date.now();
-    const threshold = now - rangeMeta.days * 24 * 60 * 60 * 1000;
-    const totalRecipes = recipes.length;
-    const totalReviews = recipes.reduce((sum, r) => sum + r.reviews.length, 0);
-    const publishedRecipes = recipes.filter((r) => r.status === 'approved').length;
-    const pendingRecipes = totalRecipes - publishedRecipes;
-    const totalUsers = admin.users.length;
-    const chefCount = admin.users.filter((user) => user.role === 'Chef').length;
-    const newSignups = admin.users.filter((user) => new Date(user.joinedAt).getTime() >= threshold).length;
-    const flaggedCount = admin.flaggedContent.length;
-    const uniqueCuisines = cuisines.length;
-    const uniqueDietary = dietary.length;
+    const totalRecipes = metrics.recipes?.total || 0;
+    const totalReviews = metrics.reviews?.total || 0;
+    const publishedRecipes = metrics.recipes?.approved || 0;
+    const pendingRecipes = metrics.recipes?.pending || 0;
+    const totalUsers = metrics.users?.total || 0;
+    const chefCount = metrics.users?.chefs || 0;
+    const flaggedCount = metrics.flags?.open || 0;
+    const uniqueCuisines = metrics.taxonomy?.cuisineTop?.length || 0;
+    const uniqueDietary = metrics.taxonomy?.dietaryTop?.length || 0;
 
-    // Top cuisines by count
     const cuisineCounts = new Map();
-    recipes.forEach((r) => {
-      cuisineCounts.set(r.cuisine, (cuisineCounts.get(r.cuisine) ?? 0) + 1);
+    allRecipes.forEach((r) => {
+      if (r.cuisine) {
+        cuisineCounts.set(r.cuisine, (cuisineCounts.get(r.cuisine) || 0) + 1);
+      }
     });
-    const topCuisines = Array.from(cuisineCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+    const topCuisines = cuisineCounts.size
+      ? Array.from(cuisineCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      : (metrics.taxonomy?.cuisineTop || []).map((entry) => [entry._id, entry.count]);
 
-    const mostDiscussed = [...recipes]
+    const mostDiscussed = [...allRecipes]
       .map((recipe) => ({
         id: recipe.id,
         title: recipe.title,
-        reviews: recipe.reviews.length,
+        reviews: recipe.reviews?.length || 0,
         cuisine: recipe.cuisine,
       }))
       .sort((a, b) => b.reviews - a.reviews)
@@ -81,7 +118,7 @@ const AdminDashboardPage = () => {
       uniqueDietary,
       totalUsers,
       chefCount,
-      newSignups,
+      newSignups: null,
       flaggedCount,
       publishedRecipes,
       pendingRecipes,
@@ -89,7 +126,26 @@ const AdminDashboardPage = () => {
       mostDiscussed,
       rangeLabel: rangeMeta.label,
     };
-  }, [state, cuisines.length, dietary.length, selectedRange]);
+  }, [metrics, selectedRange, allRecipes]);
+
+  if (loading) {
+    return (
+      <Stack spacing={2} alignItems="center">
+        <CircularProgress />
+        <Typography variant="body2" color="text.secondary">
+          Loading dashboard...
+        </Typography>
+      </Stack>
+    );
+  }
+
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
+  }
+
+  if (!stats) {
+    return null;
+  }
 
   return (
     <Stack spacing={4}>
@@ -140,7 +196,7 @@ const AdminDashboardPage = () => {
           <StatCard label="Active Chefs" value={stats.chefCount} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatCard label={`Sign-ups ${stats.rangeLabel}`} value={stats.newSignups} />
+          <StatCard label={`Sign-ups ${stats.rangeLabel}`} value={stats.newSignups ?? '—'} />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard label="Open Flags" value={stats.flaggedCount} />
@@ -161,12 +217,12 @@ const AdminDashboardPage = () => {
           Recently added recipes
         </Typography>
         <List dense>
-          {state.recipes.slice(-5).map((r) => (
+          {recentRecipes.map((r) => (
             <ListItem key={r.id} disableGutters>
               <ListItemText
                 primaryTypographyProps={{ variant: 'body2', sx: { fontWeight: 600 } }}
                 primary={r.title}
-                secondary={`${r.cuisine} • ${r.dietary.join(', ')}`}
+                secondary={`${r.cuisine || '—'} • ${(r.dietary || []).join(', ')}`}
               />
             </ListItem>
           ))}

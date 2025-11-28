@@ -14,8 +14,12 @@ export const updateCategory = (token, id, data) => apiClient.patch(`/admin/categ
 export const deleteCategory = (token, id, force = false) =>
   apiClient.del(`/admin/categories/${id}?force=${force}`, { token });
 
-export const listPendingRecipes = (token) => apiClient.get('/admin/recipes', { token });
-export const moderateRecipe = (token, id, data) => apiClient.patch(`/admin/recipes/${id}`, data, { token });
+export const listRecipes = (token, params) => apiClient.get('/admin/recipes', { token, params });
+export const updateRecipeStatus = (token, id, data) =>
+  apiClient.patch(`/admin/recipes/${id}/status`, data, { token });
+export const deleteRecipe = (token, id) => apiClient.del(`/admin/recipes/${id}`, { token });
 
 export const listFlags = (token) => apiClient.get('/admin/flags', { token });
 export const resolveFlag = (token, id, data) => apiClient.patch(`/admin/flags/${id}`, data, { token });
+export const deleteFlag = (token, id, cascade = false) =>
+  apiClient.del(`/admin/flags/${id}?cascade=${cascade}`, { token });

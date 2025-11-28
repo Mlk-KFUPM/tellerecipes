@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Grid from "@mui/material/Grid";
@@ -22,17 +22,42 @@ import Tooltip from "@mui/material/Tooltip";
 import IconButton from "@mui/material/IconButton";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { useAppDispatch, useAppState } from "../../context/AppStateContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { listRecipes, updateRecipeStatus, deleteRecipe } from "../../api/admin.js";
 
 const RecipeModerationPage = () => {
-  const dispatch = useAppDispatch();
-  const { recipes } = useAppState();
+  const { token } = useAuth();
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [decisionNotes, setDecisionNotes] = useState({});
   const [searchPending, setSearchPending] = useState("");
   const [searchPublished, setSearchPublished] = useState("");
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [removeCandidate, setRemoveCandidate] = useState(null);
   const [feedback, setFeedback] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await listRecipes(token);
+        const mapped = (res.items || res || []).map((r) => ({
+          ...r,
+          id: r._id || r.id,
+          dietary: r.dietary || [],
+          ingredients: r.ingredients || [],
+          steps: r.steps || [],
+        }));
+        setRecipes(mapped);
+      } catch (err) {
+        console.error("Failed to load recipes", err);
+        setFeedback({ severity: "error", message: err.message || "Failed to load recipes" });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [token]);
 
   const pendingSubmissions = useMemo(
     () =>
@@ -62,43 +87,44 @@ const RecipeModerationPage = () => {
     [recipes, searchPublished]
   );
 
-  const handleApprove = (id) => {
-    dispatch({
-      type: "SET_RECIPE_STATUS",
-      payload: { recipeId: id, status: "approved" },
-    });
-    setFeedback({
-      severity: "success",
-      message: "Recipe approved and published.",
-    });
-  };
-
-  const handleReject = (id) => {
-    const note = decisionNotes[id]?.trim();
-    dispatch({
-      type: "SET_RECIPE_STATUS",
-      payload: { recipeId: id, status: "rejected" },
-    });
-    if (note) {
-      dispatch({
-        type: "ADMIN_LOG_ACTION",
-        payload: { message: `Rejected submission with note: ${note}` },
+  const handleApprove = async (id) => {
+    try {
+      const updated = await updateRecipeStatus(token, id, { status: "approved" });
+      setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, ...updated, id: updated._id || updated.id } : r)));
+      setFeedback({
+        severity: "success",
+        message: "Recipe approved and published.",
       });
+    } catch (err) {
+      setFeedback({ severity: "error", message: err.message || "Failed to approve recipe" });
     }
-    setFeedback({
-      severity: "warning",
-      message: "Recipe rejected and sent back to chef.",
-    });
   };
 
-  const handleRemoveRecipe = () => {
+  const handleReject = async (id) => {
+    const note = decisionNotes[id]?.trim();
+    try {
+      const updated = await updateRecipeStatus(token, id, { status: "rejected", note });
+      setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, ...updated, id: updated._id || updated.id } : r)));
+      setFeedback({
+        severity: "warning",
+        message: "Recipe rejected and sent back to chef.",
+      });
+    } catch (err) {
+      setFeedback({ severity: "error", message: err.message || "Failed to reject recipe" });
+    }
+  };
+
+  const handleRemoveRecipe = async () => {
     if (!removeCandidate) return;
-    dispatch({
-      type: "REMOVE_RECIPE",
-      payload: { recipeId: removeCandidate.id },
-    });
-    setFeedback({ severity: "info", message: "Recipe removed from catalog." });
-    setRemoveCandidate(null);
+    try {
+      await deleteRecipe(token, removeCandidate.id);
+      setRecipes((prev) => prev.filter((r) => r.id !== removeCandidate.id));
+      setFeedback({ severity: "info", message: "Recipe removed from catalog." });
+    } catch (err) {
+      setFeedback({ severity: "error", message: err.message || "Failed to remove recipe" });
+    } finally {
+      setRemoveCandidate(null);
+    }
   };
 
   return (
@@ -132,7 +158,14 @@ const RecipeModerationPage = () => {
             />
           </Stack>
           <Grid container spacing={3}>
-            {pendingSubmissions.map((recipe) => (
+            {loading && (
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.secondary">
+                  Loading submissions...
+                </Typography>
+              </Grid>
+            )}
+            {!loading && pendingSubmissions.map((recipe) => (
               <Grid key={recipe.id} item xs={12} md={6}>
                 <Paper
                   variant="outlined"
@@ -200,7 +233,7 @@ const RecipeModerationPage = () => {
                 </Paper>
               </Grid>
             ))}
-            {!pendingSubmissions.length && (
+            {!loading && !pendingSubmissions.length && (
               <Grid item xs={12}>
                 <Typography variant="body2" color="text.secondary">
                   No pending submissions.
@@ -239,7 +272,7 @@ const RecipeModerationPage = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {approvedRecipes.map((recipe) => (
+              {!loading && approvedRecipes.map((recipe) => (
                 <TableRow key={recipe.id}>
                   <TableCell>{recipe.title}</TableCell>
                   <TableCell>{recipe.cuisine || "—"}</TableCell>
@@ -266,7 +299,7 @@ const RecipeModerationPage = () => {
                   </TableCell>
                 </TableRow>
               ))}
-              {!approvedRecipes.length && (
+              {!loading && !approvedRecipes.length && (
                 <TableRow>
                   <TableCell colSpan={4}>
                     <Typography variant="body2" color="text.secondary">
