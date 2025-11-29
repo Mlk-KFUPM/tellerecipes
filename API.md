@@ -1,6 +1,6 @@
-# TellerRecipes API Contract (draft)
+# TellerRecipes API Contract
 
-Base URL: `/api`
+Base URL: `/` (e.g. `http://localhost:5001`)
 
 Auth uses HTTP-only cookies for refresh tokens and Bearer access tokens. All protected endpoints require a valid access token; admin- and chef-only endpoints additionally enforce role checks.
 
@@ -8,20 +8,19 @@ Auth uses HTTP-only cookies for refresh tokens and Bearer access tokens. All pro
 
 - `POST /auth/register` — Create a user account. Body: `{ username, email, password }`. Returns user summary + access token.
 - `POST /auth/login` — Sign in with email/password. Body: `{ email, password }`. Returns tokens and role.
-- `POST /auth/logout` — Revoke current refresh session.
+- `POST /auth/logout` — Revoke refresh session. Body: `{ refreshToken? }` (optional, also clears cookie).
 
 Example: register
 
 Request
 ```http
-POST /api/auth/register
+POST /auth/register
 Content-Type: application/json
 
 {
   "username": "amina",
   "email": "amina@example.com",
-  "password": "password123",
-  "role": "user"
+  "password": "password123"
 }
 ```
 
@@ -32,10 +31,10 @@ Response
     "id": "user-001",
     "username": "amina",
     "email": "amina@example.com",
-    "role": "user"
+    "role": "user",
+    "status": "active"
   },
-  "accessToken": "jwt-access-token",
-  "refreshToken": "httpOnly cookie"
+  "accessToken": "jwt-access-token"
 }
 ```
 
@@ -44,82 +43,29 @@ Response
 - `GET /user/profile` — Get current user profile.
 - `PATCH /user/profile` — Update name/email/avatar.
 - `PATCH /user/password` — Change password (requires current password).
-- `GET /recipes` — List recipes with filters: `search`, `cuisine`, `dietary[]`, `page`, `limit`, `sort`.
-- `GET /recipes/:id` — Recipe detail (includes ingredients, steps, reviews summary).
-- `POST /recipes/:id/save` — Toggle save to collections (optional `collectionIds` in body).
-- `GET /collections` — List user collections and their recipe ids.
-- `POST /collections` — Create collection. Body: `{ name, description?, visibility? }`.
-- `PATCH /collections/:id` — Rename/update collection, add/remove recipes.
-- `DELETE /collections/:id` — Delete a collection.
-- `GET /shopping-list` — Fetch shopping list (recipes + consolidated items).
-- `POST /shopping-list` — Generate/update shopping list from recipeIds. Body: `{ recipeIds }`.
-- `DELETE /shopping-list` — Clear shopping list.
-- `DELETE /shopping-list/recipes/:id` — Remove one recipe from the list.
-- `POST /recipes/:id/reviews` — Add a review. Body: `{ rating, comment }`.
-- `GET /recipes/:id/reviews` — List reviews for the recipe (paginated).
+- `GET /user/recipes` — List approved recipes. Query params:
+    - `search`: text search on title/description
+    - `cuisine`: filter by cuisine
+    - `dietary`: filter by dietary tags (can be array)
+    - `page`: page number (default 1)
+    - `limit`: items per page (default 20)
+    - `sort`: `rating` (highest rated) or default (newest)
+- `GET /user/recipes/:id` — Recipe detail (includes ingredients, steps, reviews summary).
+- `POST /user/recipes/:id/save` — Toggle save to collections (optional `collectionIds` in body).
+- `GET /user/collections` — List user collections and their recipe ids.
+- `POST /user/collections` — Create collection. Body: `{ name, description?, visibility? }`.
+- `PATCH /user/collections/:id` — Rename/update collection, add/remove recipes.
+- `DELETE /user/collections/:id` — Delete a collection.
+- `GET /user/shopping-list` — Fetch shopping list (recipes + consolidated items).
+- `POST /user/shopping-list` — Generate/update shopping list from recipeIds. Body: `{ recipeIds }`.
+- `DELETE /user/shopping-list` — Clear shopping list.
+- `DELETE /user/shopping-list/recipes/:id` — Remove one recipe from the list.
+- `POST /user/recipes/:id/reviews` — Add a review. Body: `{ rating, comment }`.
+- `GET /user/recipes/:id/reviews` — List reviews for the recipe (paginated).
 
 Example: list recipes with filters
 ```http
-GET /api/recipes?search=chicken&cuisine=American&dietary=Gluten%20Free
-```
-Response (200)
-```json
-{
-  "items": [
-    {
-      "id": "recipe-001",
-      "title": "Herb Roasted Chicken with Root Vegetables",
-      "description": "A comforting sheet-pan dinner...",
-      "cuisine": "American",
-      "dietary": ["Gluten Free"],
-      "cookTime": 55,
-      "servings": 4,
-      "image": "https://...",
-      "rating": { "average": 5, "count": 1 }
-    }
-  ],
-  "page": 1,
-  "pageSize": 20,
-  "total": 1
-}
-```
-
-Example: add review
-```http
-POST /api/recipes/recipe-001/reviews
-Content-Type: application/json
-Authorization: Bearer <token>
-
-{ "rating": 5, "comment": "Perfect Sunday dinner!" }
-```
-Response (201)
-```json
-{
-  "id": "review-999",
-  "author": "Amina Baker",
-  "rating": 5,
-  "comment": "Perfect Sunday dinner!",
-  "createdAt": "2024-03-12T10:00:00Z"
-}
-```
-
-Example: generate shopping list
-```http
-POST /api/shopping-list
-Content-Type: application/json
-Authorization: Bearer <token>
-
-{ "recipeIds": ["recipe-001", "recipe-003"] }
-```
-Response (200)
-```json
-{
-  "recipeIds": ["recipe-001", "recipe-003"],
-  "consolidatedItems": [
-    { "name": "Garlic cloves", "quantity": 8, "unit": "pcs" },
-    { "name": "Olive oil", "quantity": 3, "unit": "tbsp" }
-  ]
-}
+GET /user/recipes?search=chicken&cuisine=American&dietary=Gluten%20Free&sort=rating
 ```
 
 ## Chef (approved chefs)
@@ -128,42 +74,16 @@ Response (200)
 - `POST /chef/apply` — Submit chef application. Body: `{ fullName, email, displayName, bio, specialties[], yearsExperience, signatureDish, phone?, website? }`.
 - `PATCH /chef/profile` — Update approved/pending profile fields.
 - `GET /chef/recipes` — List chef-owned recipes with status filters.
-- `POST /chef/recipes` — Create recipe (draft/pending). Body includes title, description, cuisine, dietary[], categories[], prepTime, cookTime, servings, image, gallery[], ingredients[], steps[].
+- `POST /chef/recipes` — Create recipe. Body includes title, description, cuisine, dietary[], categories[], prepTime, cookTime, servings, image, gallery[], ingredients[], steps[].
+    - `categories` can be IDs or new string labels (which will be created as new categories).
 - `PATCH /chef/recipes/:id` — Update recipe; major changes set status back to pending.
 - `DELETE /chef/recipes/:id` — Remove own recipe (soft delete/archived).
 - `POST /chef/recipes/:id/replies` — Reply to a review. Body: `{ reviewId, comment }`.
 - `GET /chef/analytics` — Engagement stats (views, saves, ratings) per recipe.
 
-Example: submit chef application
-```http
-POST /api/chef/apply
-Content-Type: application/json
-Authorization: Bearer <token>
-
-{
-  "fullName": "Amina Baker",
-  "email": "amina.baker@example.com",
-  "displayName": "Chef Amina",
-  "bio": "North African-inspired chef...",
-  "specialties": ["Moroccan", "Vegetarian Comfort"],
-  "yearsExperience": 9,
-  "signatureDish": "Preserved Lemon & Chickpea Tagine",
-  "phone": "",
-  "website": "https://chefamina.example.com"
-}
-```
-Response (201)
-```json
-{
-  "id": "chef-001",
-  "status": "pending",
-  "submittedAt": "2024-03-12T10:00:00Z"
-}
-```
-
 Example: create recipe
 ```http
-POST /api/chef/recipes
+POST /chef/recipes
 Content-Type: application/json
 Authorization: Bearer <token>
 
@@ -177,20 +97,15 @@ Authorization: Bearer <token>
   "cookTime": 30,
   "servings": 4,
   "image": "https://...",
-  "gallery": [],
   "ingredients": [
     { "name": "Cauliflower heads", "quantity": 2, "unit": "medium" },
     { "name": "Harissa paste", "quantity": 3, "unit": "tbsp" }
   ],
   "steps": [
-    "Heat oven to 425°F.",
-    "Brush harissa on steaks and roast until caramelized."
+    { "description": "Heat oven to 425°F.", "order": 1 },
+    { "description": "Brush harissa on steaks.", "order": 2 }
   ]
 }
-```
-Response (201)
-```json
-{ "id": "recipe-chef-001", "status": "pending" }
 ```
 
 ## Admin
@@ -207,39 +122,15 @@ Response (201)
 - `PATCH /admin/flags/:id` — Dismiss or mark handled. Body: `{ status, actionNote? }`.
 - `DELETE /admin/flags/:id` — Remove flagged content (and optionally cascade to delete target).
 - `GET /admin/users` — List users with filters (`role`, `status`, `search`).
-- `PATCH /admin/users/:id/status` — Activate/deactivate user.
+- `PATCH /admin/users/:id/status` — Activate/deactivate user. Activating a chef user automatically approves their chef profile.
 - `PATCH /admin/users/:id/role` — Promote/demote (e.g., to/from Chef).
 - `DELETE /admin/users/:id` — Delete user (blocked for self/admin safety).
 
 Example: approve recipe
 ```http
-PATCH /api/admin/recipes/recipe-chef-001/status
+PATCH /admin/recipes/recipe-chef-001/status
 Content-Type: application/json
 Authorization: Bearer <admin token>
 
 { "status": "approved", "note": "Looks great." }
 ```
-Response (200)
-```json
-{ "id": "recipe-chef-001", "status": "approved", "approvedAt": "2024-03-12T10:00:00Z" }
-```
-
-Example: manage categories
-```http
-POST /api/admin/categories
-Content-Type: application/json
-Authorization: Bearer <admin token>
-
-{ "label": "Weeknight Dinner", "type": "category" }
-```
-Response (201)
-```json
-{ "id": "cat-123", "label": "Weeknight Dinner", "type": "category" }
-```
-
-## Notes derived from frontend
-
-- Frontend uses filters for cuisines/dietary/categories; provide them via `/admin/categories` (for admins) and `/recipes` filter metadata for diners.
-- Chef flow: apply -> pending -> approved; approved chefs can create/update recipes; major updates trigger re-review.
-- Admin panels cover recipe moderation, flagged content (recipes/reviews), user management, and taxonomy configuration.
-- Shopping list aggregates ingredients across selected recipes; keep endpoints idempotent for regenerating lists.
