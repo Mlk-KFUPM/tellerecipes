@@ -96,10 +96,34 @@ Consider nested layouts if Chef/Admin need different navigation shells.
 - `AppStateContext` manages shared state for the user journey. Extend its reducer and selectors for Chef/Admin features.
 - Replace `src/data/mockRecipes.js` with API calls once backend endpoints are ready. Until then, update the mock data to simulate new features.
 
+## Backend Development
+
+The backend is an Express.js application connected to MongoDB.
+
+### Structure
+
+```
+server/
+├── models/          # Mongoose schemas (User, Recipe, etc.)
+├── routes/          # API route handlers (auth, user, chef, admin)
+├── middleware/      # Auth checks, validation, error handling
+├── db.js            # Database connection logic
+├── seeder.js        # Data population script
+└── server.js        # Entry point
+```
+
+### Guidelines
+
+- **Routes**: Group routes by feature/role in `server/routes/`.
+- **Models**: Define schemas in `server/models/` with strict typing and validation.
+- **Auth**: Use `requireAuth` middleware for protected routes. Use `requireRole('role')` for role-specific access.
+- **Validation**: Validate input in the route handler before processing. Return `400` for bad requests.
+- **Error Handling**: Wrap async route handlers in `try/catch` blocks and return `500` with a generic error message (log the actual error).
+
 ## Code Style & Testing
 
-- Stick to functional components and hooks
-- Use the existing theme tokens defined in `src/theme/index.js`
+- Stick to functional components and hooks (Frontend)
+- Use the existing theme tokens defined in `src/theme/index.js` (Frontend)
 - Prefer reusing components over duplicating markup; extract shared pieces into the `components/` tree
 - Add tests (React Testing Library) alongside new components when feasible
 
