@@ -1,13 +1,17 @@
 import PropTypes from 'prop-types';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAppState } from '../context/AppStateContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const ProtectedRoute = ({ redirectTo }) => {
-  const { session } = useAppState();
+  const { isAuthenticated, status } = useAuth();
   const location = useLocation();
 
-  if (!session.isAuthenticated) {
-    return <Navigate to={redirectTo} replace state={{ from: location }} />;
+  if (status === 'loading') {
+    return null; // Or a loading spinner
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to={redirectTo} replace state={{ from: location, message: 'Please sign in to access this page.' }} />;
   }
 
   return <Outlet />;

@@ -6,7 +6,7 @@ import Divider from "@mui/material/Divider";
 import Paper from "@mui/material/Paper";
 import dayjs from "dayjs";
 
-const ReviewList = ({ reviews }) => {
+const ReviewList = ({ reviews = [] }) => {
   if (!reviews.length) {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -83,8 +83,6 @@ ReviewList.propTypes = {
   ),
 };
 
-ReviewList.defaultProps = {
-  reviews: [],
-};
+
 
 export default ReviewList;

@@ -28,7 +28,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime.js';
-import { useAppDispatch } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const makeId = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -123,7 +123,7 @@ const toFormShape = (recipe) =>
           alternatives: (ingredient.alternatives || []).join(', '),
         })),
         steps: (recipe.steps || []).map((step) => ({
-          description: step,
+          description: step.description || '',
         })),
         changeType: 'minor',
       }
@@ -143,8 +143,8 @@ const toFormShape = (recipe) =>
         changeType: 'minor',
       };
 
-const ChefRecipeManager = ({ recipes, profileStatus }) => {
-  const dispatch = useAppDispatch();
+const ChefRecipeManager = ({ recipes, profileStatus, onCreate, onUpdate, onDelete }) => {
+  useAuth(); // ensure auth context mounted for cookie-based calls
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState('create');
   const [editingRecipe, setEditingRecipe] = useState(null);
@@ -230,21 +230,16 @@ const ChefRecipeManager = ({ recipes, profileStatus }) => {
         unit: ingredient.unit || '',
         alternatives: normalizeList(ingredient.alternatives || ''),
       })),
-      steps: values.steps.map((step) => step.description.trim()).filter(Boolean),
+      steps: values.steps
+        .map((step, index) => ({ description: step.description.trim(), order: index + 1 }))
+        .filter((step) => step.description),
     };
 
     if (mode === 'create') {
-      dispatch({ type: 'CREATE_CHEF_RECIPE', payload: normalized });
+      onCreate(normalized);
       setFeedback({ variant: 'success', message: 'Your recipe has been submitted for review!' });
     } else if (editingRecipe) {
-      dispatch({
-        type: 'UPDATE_CHEF_RECIPE',
-        payload: {
-          recipeId: editingRecipe.id,
-          changes: normalized,
-          changeType: values.changeType || 'minor',
-        },
-      });
+      onUpdate(editingRecipe.id, normalized);
       setFeedback({
         variant: values.changeType === 'major' ? 'warning' : 'success',
         message:
@@ -601,11 +596,17 @@ ChefRecipeManager.propTypes = {
     }),
   ),
   profileStatus: PropTypes.string,
+  onCreate: PropTypes.func,
+  onUpdate: PropTypes.func,
+  onDelete: PropTypes.func,
 };
 
 ChefRecipeManager.defaultProps = {
   recipes: [],
   profileStatus: 'pending',
+  onCreate: () => {},
+  onUpdate: () => {},
+  onDelete: () => {},
 };
 
 export default ChefRecipeManager;

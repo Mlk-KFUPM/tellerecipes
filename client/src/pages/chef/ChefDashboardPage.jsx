@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -9,11 +9,105 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Rating from '@mui/material/Rating';
 import dayjs from 'dayjs';
-import { useAppState } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { fetchProfile, listRecipes, listAnalytics } from '../../api/chef.js';
 
 const ChefDashboardPage = () => {
   const navigate = useNavigate();
-  const { chefProfile, chefRecipeSummaries, chefEngagement } = useAppState();
+  const { token } = useAuth();
+  const [chefProfile, setChefProfile] = useState(null);
+  const [recipes, setRecipes] = useState([]);
+  const [analytics, setAnalytics] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [profileRes, recipesRes, analyticsRes] = await Promise.allSettled([
+          fetchProfile(token),
+          listRecipes(token),
+          listAnalytics(token),
+        ]);
+        if (profileRes.status === 'fulfilled') setChefProfile(profileRes.value);
+        if (recipesRes.status === 'fulfilled') {
+          const mapped = (recipesRes.value.items || recipesRes.value || []).map((r) => ({
+            ...r,
+            id: r._id || r.id,
+            dietary: r.dietary || [],
+            ingredients: r.ingredients || [],
+            steps: r.steps || [],
+          }));
+          setRecipes(mapped);
+        }
+        if (analyticsRes.status === 'fulfilled') {
+          const mapped = (analyticsRes.value.items || analyticsRes.value || []).map((r) => ({
+            ...r,
+            id: r._id || r.id,
+          }));
+          setAnalytics(mapped);
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to load chef data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) load();
+  }, [token]);
+
+  const engagementTotals = useMemo(() => {
+    const totals = { views: 0, saves: 0, averageRating: 0, ratingsCount: 0 };
+    if (!analytics.length) return totals;
+    let ratingSum = 0;
+    analytics.forEach((r) => {
+      totals.views += r.engagement?.views || 0;
+      totals.saves += r.engagement?.saves || 0;
+      const count = r.ratingSummary?.count || 0;
+      const avg = r.ratingSummary?.average || 0;
+      totals.ratingsCount += count;
+      ratingSum += count * avg;
+    });
+    totals.averageRating = totals.ratingsCount ? Number((ratingSum / totals.ratingsCount).toFixed(1)) : 0;
+    return totals;
+  }, [analytics]);
+
+  const publishedRecipes = recipes.filter((recipe) => recipe.status === 'approved');
+  const pendingRecipes = recipes.filter((recipe) => recipe.status !== 'approved');
+
+  const latestReview = useMemo(() => {
+    const allReviews = recipes.flatMap((recipe) =>
+      (recipe.reviews || []).map((review) => ({
+        ...review,
+        recipeTitle: recipe.title,
+      })),
+    );
+    if (!allReviews.length) {
+      return null;
+    }
+    return allReviews.sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())[0];
+  }, [recipes]);
+
+  const isPending = chefProfile && chefProfile.status !== 'approved';
+
+  if (loading) {
+    return (
+      <Stack spacing={2}>
+        <Typography variant="body2" color="text.secondary">
+          Loading chef workspace...
+        </Typography>
+      </Stack>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error">
+        {error}
+      </Alert>
+    );
+  }
 
   if (!chefProfile) {
     return (
@@ -24,31 +118,12 @@ const ChefDashboardPage = () => {
         <Typography variant="body1" color="text.secondary">
           You have not submitted a chef application yet. Start by sharing your story and experience so our team can approve your contributor account.
         </Typography>
-        <Button variant="contained" onClick={() => navigate('/auth/become-chef')} sx={{ alignSelf: 'flex-start' }}>
+        <Button variant="contained" onClick={() => navigate('/app/become-chef')} sx={{ alignSelf: 'flex-start' }}>
           Apply now
         </Button>
       </Stack>
     );
   }
-
-  const totals = chefEngagement?.totals;
-  const publishedRecipes = chefRecipeSummaries.filter((recipe) => recipe.status === 'approved');
-  const pendingRecipes = chefRecipeSummaries.filter((recipe) => recipe.status !== 'approved');
-
-  const latestReview = useMemo(() => {
-    const allReviews = chefRecipeSummaries.flatMap((recipe) =>
-      (recipe.reviews || []).map((review) => ({
-        ...review,
-        recipeTitle: recipe.title,
-      })),
-    );
-    if (!allReviews.length) {
-      return null;
-    }
-    return allReviews.sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())[0];
-  }, [chefRecipeSummaries]);
-
-  const isPending = chefProfile.status !== 'approved';
 
   return (
     <Stack spacing={4}>
@@ -94,10 +169,10 @@ const ChefDashboardPage = () => {
               Saves & favourites
             </Typography>
             <Typography variant="h4" sx={{ fontWeight: 700 }}>
-              {totals?.saves?.toLocaleString() ?? '0'}
+              {engagementTotals?.saves?.toLocaleString() ?? '0'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {totals?.views ? `${totals.views.toLocaleString()} total views` : 'Share your first recipe to generate engagement'}
+              {engagementTotals?.views ? `${engagementTotals.views.toLocaleString()} total views` : 'Share your first recipe to generate engagement'}
             </Typography>
           </Paper>
         </Grid>
@@ -111,12 +186,12 @@ const ChefDashboardPage = () => {
             </Typography>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                {Number(totals?.averageRating ?? 0).toFixed(1)}
+                {Number(engagementTotals?.averageRating ?? 0).toFixed(1)}
               </Typography>
-              <Rating size="small" value={Number(totals?.averageRating ?? 0)} precision={0.1} readOnly />
+              <Rating size="small" value={Number(engagementTotals?.averageRating ?? 0)} precision={0.1} readOnly />
             </Stack>
             <Typography variant="body2" color="text.secondary">
-              {totals?.ratingsCount ? `${totals.ratingsCount} diner ratings` : 'Collect reviews to build trust'}
+              {engagementTotals?.ratingsCount ? `${engagementTotals.ratingsCount} diner ratings` : 'Collect reviews to build trust'}
             </Typography>
           </Paper>
         </Grid>

@@ -27,8 +27,7 @@ const App = () => (
     <Route path="/" element={<Navigate to="/auth/login" replace />} />
     <Route path="/auth/login" element={<LoginPage />} />
     <Route path="/auth/register" element={<RegisterPage />} />
-    <Route path="/auth/become-chef" element={<ChefApplicationPage />} />
-    <Route path="/auth/become-chef/pending" element={<ChefApplicationPendingPage />} />
+
     <Route element={<ProtectedRoute />}>
       <Route path="/app" element={<Navigate to="/app/user" replace />} />
       <Route path="/app/user" element={<DashboardLayout role="user" />}>
@@ -38,6 +37,8 @@ const App = () => (
         <Route path="shopping-list" element={<ShoppingListPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
+      <Route path="/app/become-chef" element={<ChefApplicationPage />} />
+      <Route path="/app/become-chef/pending" element={<ChefApplicationPendingPage />} />
       <Route element={<RoleRoute allowedRoles={["chef"]} redirectTo="/app/user" />}>
         <Route path="/app/chef" element={<DashboardLayout role="chef" />}>
           <Route index element={<ChefDashboardPage />} />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
@@ -6,22 +6,50 @@ import Button from '@mui/material/Button';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
-import Divider from '@mui/material/Divider';
-import { useAppDispatch, useAppState } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { listFlags, resolveFlag, deleteFlag } from '../../api/admin.js';
 
 const FlaggedContentPage = () => {
-  const dispatch = useAppDispatch();
-  const { admin } = useAppState();
+  const { token } = useAuth();
+  const [flags, setFlags] = useState([]);
   const [feedback, setFeedback] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleDismiss = (id) => {
-    dispatch({ type: 'ADMIN_DISMISS_FLAG', payload: { flagId: id } });
-    setFeedback({ severity: 'success', message: 'Flag dismissed.' });
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await listFlags(token);
+        const mapped = (res.items || res || []).map((f) => ({ ...f, id: f._id || f.id }));
+        setFlags(mapped);
+      } catch (err) {
+        console.error('Failed to load flags', err);
+        setFeedback({ severity: 'error', message: err.message || 'Failed to load flags' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [token]);
+
+  const handleDismiss = async (id) => {
+    try {
+      const updated = await resolveFlag(token, id, { status: 'dismissed' });
+      setFlags((prev) => prev.map((f) => (f.id === id ? { ...f, ...updated, id: updated._id || updated.id } : f)));
+      setFeedback({ severity: 'success', message: 'Flag dismissed.' });
+    } catch (err) {
+      setFeedback({ severity: 'error', message: err.message || 'Failed to dismiss flag' });
+    }
   };
 
-  const handleRemove = (id, type) => {
-    dispatch({ type: 'ADMIN_REMOVE_FLAGGED_ITEM', payload: { flagId: id, removalType: type } });
-    setFeedback({ severity: 'warning', message: `Removed flagged ${type}.` });
+  const handleRemove = async (id, type) => {
+    try {
+      await deleteFlag(token, id, true);
+      setFlags((prev) => prev.filter((f) => f.id !== id));
+      setFeedback({ severity: 'warning', message: `Removed flagged ${type}.` });
+    } catch (err) {
+      setFeedback({ severity: 'error', message: err.message || 'Failed to remove content' });
+    }
   };
 
   return (
@@ -36,7 +64,7 @@ const FlaggedContentPage = () => {
       </Stack>
 
       <Stack spacing={2}>
-        {admin.flaggedContent.map((item) => (
+        {flags.map((item) => (
           <Paper key={item.id} elevation={0} sx={{ p: 3, borderRadius: 3 }}>
             <Stack spacing={1.5}>
               <Stack spacing={1}>
@@ -73,39 +101,17 @@ const FlaggedContentPage = () => {
             </Stack>
           </Paper>
         ))}
-        {!admin.flaggedContent.length && (
+        {!loading && !flags.length && (
           <Typography variant="body2" color="text.secondary">
             No flagged items. You’re all caught up.
           </Typography>
         )}
-      </Stack>
-
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 3 }}>
-        <Stack spacing={1}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Action log
-          </Typography>
+        {loading && (
           <Typography variant="body2" color="text.secondary">
-            A lightweight record of the last moderation actions taken in this session.
+            Loading flags...
           </Typography>
-          <Divider sx={{ my: 1 }} />
-          <Stack spacing={1}>
-            {admin.actionLog.slice(0, 5).map((entry) => (
-              <Stack key={entry.id}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Typography>
-                <Typography variant="body2">{entry.message}</Typography>
-              </Stack>
-            ))}
-            {!admin.actionLog.length && (
-              <Typography variant="body2" color="text.secondary">
-                Actions taken here will appear in this session log.
-              </Typography>
-            )}
-          </Stack>
-        </Stack>
-      </Paper>
+        )}
+      </Stack>
 
       <Snackbar
         open={Boolean(feedback)}

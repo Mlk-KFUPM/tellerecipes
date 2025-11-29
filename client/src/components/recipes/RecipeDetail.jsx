@@ -12,7 +12,10 @@ import Rating from '@mui/material/Rating';
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart';
 
-const RecipeDetail = ({ recipe, onSave, onAddToList }) => (
+const RecipeDetail = ({ recipe, onSave, onAddToList }) => {
+  const rating = recipe.ratingSummary || recipe.rating || { average: 0, count: 0 };
+
+  return (
   <Stack spacing={4}>
     <Grid container spacing={4}>
       <Grid item xs={12} md={6}>
@@ -35,9 +38,9 @@ const RecipeDetail = ({ recipe, onSave, onAddToList }) => (
           </Stack>
 
           <Stack direction="row" spacing={2} alignItems="center">
-            <Rating value={recipe.rating.average} precision={0.5} readOnly />
+            <Rating value={rating.average} precision={0.5} readOnly />
             <Typography variant="body2" color="text.secondary">
-              {recipe.rating.count} review{recipe.rating.count === 1 ? '' : 's'}
+              {rating.count} review{rating.count === 1 ? '' : 's'}
             </Typography>
             <Chip label={`${recipe.cookTime} mins`} />
             <Chip label={`Serves ${recipe.servings}`} variant="outlined" />
@@ -83,10 +86,10 @@ const RecipeDetail = ({ recipe, onSave, onAddToList }) => (
             <Stack spacing={2}>
               <Typography variant="h6">Method</Typography>
               {recipe.steps.map((step, index) => (
-                <Stack key={step} spacing={0.5}>
+                <Stack key={index} spacing={0.5}>
                   <Typography variant="subtitle2">Step {index + 1}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {step}
+                    {typeof step === 'string' ? step : step.description}
                   </Typography>
                   {index < recipe.steps.length - 1 && <Divider />}
                 </Stack>
@@ -97,7 +100,8 @@ const RecipeDetail = ({ recipe, onSave, onAddToList }) => (
       </Grid>
     </Grid>
   </Stack>
-);
+  );
+};
 
 RecipeDetail.propTypes = {
   recipe: PropTypes.shape({
@@ -106,9 +110,13 @@ RecipeDetail.propTypes = {
     description: PropTypes.string.isRequired,
     image: PropTypes.string.isRequired,
     rating: PropTypes.shape({
-      average: PropTypes.number.isRequired,
-      count: PropTypes.number.isRequired,
-    }).isRequired,
+      average: PropTypes.number,
+      count: PropTypes.number,
+    }),
+    ratingSummary: PropTypes.shape({
+      average: PropTypes.number,
+      count: PropTypes.number,
+    }),
     cookTime: PropTypes.number.isRequired,
     servings: PropTypes.number.isRequired,
     cuisine: PropTypes.string.isRequired,
@@ -121,7 +129,15 @@ RecipeDetail.propTypes = {
         unit: PropTypes.string.isRequired,
       }),
     ).isRequired,
-    steps: PropTypes.arrayOf(PropTypes.string).isRequired,
+    steps: PropTypes.arrayOf(
+      PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.shape({
+          description: PropTypes.string.isRequired,
+          order: PropTypes.number,
+        }),
+      ]),
+    ).isRequired,
   }).isRequired,
   onSave: PropTypes.func.isRequired,
   onAddToList: PropTypes.func.isRequired,

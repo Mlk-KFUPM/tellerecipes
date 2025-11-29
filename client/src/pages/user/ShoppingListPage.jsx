@@ -1,15 +1,63 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import ShoppingListSummary from '../../components/shopping/ShoppingListSummary.jsx';
-import { useAppDispatch, useAppState, selectShoppingListDetails } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { getShoppingList, updateShoppingList, clearShoppingList, removeFromShoppingList, getRecipe } from '../../api/user.js';
 
 const ShoppingListPage = () => {
-  const state = useAppState();
-  const dispatch = useAppDispatch();
-  const shoppingData = useMemo(() => selectShoppingListDetails(state), [state]);
+  const { token } = useAuth();
+  const [recipeMap, setRecipeMap] = useState({});
+  const [recipeIds, setRecipeIds] = useState([]);
   const [isGenerated, setIsGenerated] = useState(false);
   const [feedback, setFeedback] = useState({ open: false, message: '', severity: 'success' });
+  const [loading, setLoading] = useState(false);
+
+  const shoppingData = useMemo(() => {
+    const recipes = recipeIds.map((id) => recipeMap[id]).filter(Boolean);
+    const consolidatedMap = new Map();
+    recipes.forEach((recipe) => {
+      (recipe.ingredients || []).forEach((ingredient) => {
+        const key = ingredient.name.toLowerCase();
+        const existing = consolidatedMap.get(key);
+        if (existing) {
+          consolidatedMap.set(key, { ...existing, quantity: existing.quantity + (ingredient.quantity || 0) });
+        } else {
+          consolidatedMap.set(key, { ...ingredient });
+        }
+      });
+    });
+    return {
+      recipes,
+      consolidated: Array.from(consolidatedMap.values()),
+    };
+  }, [recipeIds, recipeMap]);
+
+  useEffect(() => {
+    if (!token) return;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await getShoppingList(token);
+        const ids = (res.recipeIds || []).map((id) => id.toString());
+        setRecipeIds(ids);
+        await Promise.all(
+          ids.map(async (id) => {
+            if (recipeMap[id]) return;
+            const data = await getRecipe(id);
+            const mapped = { ...data, id: data._id || data.id, dietary: data.dietary || [], ingredients: data.ingredients || [] };
+            setRecipeMap((prev) => ({ ...prev, [mapped.id]: mapped }));
+          }),
+        );
+      } catch (err) {
+        console.error('Failed to load shopping list', err);
+        setFeedback({ open: true, message: err.message || 'Failed to load shopping list', severity: 'error' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [token]);
 
   const handleGenerate = () => {
     if (!shoppingData.recipes.length) {
@@ -20,14 +68,22 @@ const ShoppingListPage = () => {
   };
 
   const handleClear = () => {
-    dispatch({ type: 'CLEAR_SHOPPING_LIST' });
-    setIsGenerated(false);
-    setFeedback({ open: true, message: 'Shopping list cleared', severity: 'info' });
+    clearShoppingList(token)
+      .then(() => {
+        setRecipeIds([]);
+        setIsGenerated(false);
+        setFeedback({ open: true, message: 'Shopping list cleared', severity: 'info' });
+      })
+      .catch((err) => setFeedback({ open: true, message: err.message || 'Failed to clear list', severity: 'error' }));
   };
 
   const handleRemoveRecipe = (recipeId) => {
-    dispatch({ type: 'REMOVE_RECIPE_FROM_SHOPPING_LIST', payload: { recipeId } });
-    setFeedback({ open: true, message: 'Recipe removed from shopping list', severity: 'info' });
+    removeFromShoppingList(token, recipeId)
+      .then((res) => {
+        setRecipeIds((res.recipeIds || []).map((id) => id.toString()));
+        setFeedback({ open: true, message: 'Recipe removed from shopping list', severity: 'info' });
+      })
+      .catch((err) => setFeedback({ open: true, message: err.message || 'Failed to update list', severity: 'error' }));
   };
 
   const handleExport = async () => {

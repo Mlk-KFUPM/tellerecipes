@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -17,7 +17,13 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItemSecondaryAction from '@mui/material/ListItemSecondaryAction';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useAppDispatch, useAppState } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import {
+  listCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from '../../api/admin.js';
 
 const TYPES = [
   { label: 'Categories', value: 'category', helper: 'General groupings surfaced across the site.' },
@@ -26,41 +32,61 @@ const TYPES = [
 ];
 
 const CategoriesPage = () => {
-  const dispatch = useAppDispatch();
-  const { admin } = useAppState();
+  const { token } = useAuth();
   const [type, setType] = useState('category');
+  const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [editing, setEditing] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await listCategories(token, type ? { type } : undefined);
+        const items = (res.items || res || []).map((c) => ({ ...c, id: c._id || c.id }));
+        setCategories(items);
+      } catch (err) {
+        console.error('Load categories failed', err);
+        setFeedback({ severity: 'error', message: err.message || 'Failed to load categories' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [token, type]);
 
   const items = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return admin.categories
-      .filter((category) => category.type === type)
+    return categories
       .filter((category) => (term ? category.label.toLowerCase().includes(term) : true))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [admin.categories, type, search]);
+  }, [categories, search]);
 
   const isDuplicate = (label, ignoreId = null) =>
-    admin.categories.some(
-      (category) =>
-        category.type === type &&
-        category.label.toLowerCase() === label.trim().toLowerCase() &&
-        category.id !== ignoreId,
+    categories.some(
+      (category) => category.type === type && category.label.toLowerCase() === label.trim().toLowerCase() && category.id !== ignoreId,
     );
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newLabel.trim() || isDuplicate(newLabel)) {
       setFeedback({ severity: 'error', message: 'Enter a unique name before adding.' });
       return;
     }
-    dispatch({ type: 'ADMIN_ADD_CATEGORY', payload: { label: newLabel.trim(), type } });
-    setFeedback({ severity: 'success', message: `${TYPES.find((t) => t.value === type)?.label ?? 'Entry'} added.` });
-    setNewLabel('');
+    try {
+      const created = await createCategory(token, { label: newLabel.trim(), type });
+      const mapped = { ...created, id: created._id || created.id };
+      setCategories((prev) => [...prev, mapped]);
+      setFeedback({ severity: 'success', message: `${TYPES.find((t) => t.value === type)?.label ?? 'Entry'} added.` });
+      setNewLabel('');
+    } catch (err) {
+      setFeedback({ severity: 'error', message: err.message || 'Failed to add category' });
+    }
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editing?.value.trim()) {
       setFeedback({ severity: 'error', message: 'Label cannot be empty.' });
       return;
@@ -69,14 +95,25 @@ const CategoriesPage = () => {
       setFeedback({ severity: 'error', message: 'Name must be unique.' });
       return;
     }
-    dispatch({ type: 'ADMIN_UPDATE_CATEGORY', payload: { id: editing.id, label: editing.value.trim() } });
-    setFeedback({ severity: 'success', message: 'Label updated.' });
-    setEditing(null);
+    try {
+      const updated = await updateCategory(token, editing.id, { label: editing.value.trim() });
+      const mapped = { ...updated, id: updated._id || updated.id };
+      setCategories((prev) => prev.map((cat) => (cat.id === mapped.id ? mapped : cat)));
+      setFeedback({ severity: 'success', message: 'Label updated.' });
+      setEditing(null);
+    } catch (err) {
+      setFeedback({ severity: 'error', message: err.message || 'Failed to update category' });
+    }
   };
 
-  const handleDelete = (id) => {
-    dispatch({ type: 'ADMIN_DELETE_CATEGORY', payload: { id } });
-    setFeedback({ severity: 'info', message: 'Entry removed.' });
+  const handleDelete = async (id) => {
+    try {
+      await deleteCategory(token, id, false);
+      setCategories((prev) => prev.filter((cat) => cat.id !== id));
+      setFeedback({ severity: 'info', message: 'Entry removed.' });
+    } catch (err) {
+      setFeedback({ severity: 'error', message: err.message || 'Failed to delete entry' });
+    }
   };
 
   const helperText = TYPES.find((item) => item.value === type)?.helper;
@@ -134,7 +171,7 @@ const CategoriesPage = () => {
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3 }}>
             <Stack spacing={2}>
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                {items.length} entries
+                {loading ? 'Loading entries...' : `${items.length} entries`}
               </Typography>
               <List dense>
                 {items.map((item) => (

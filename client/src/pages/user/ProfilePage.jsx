@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
@@ -11,16 +11,33 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import ControlledTextField from '../../components/forms/ControlledTextField.jsx';
 import PasswordField from '../../components/forms/PasswordField.jsx';
-import { useAppDispatch, useAppState } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { fetchProfile, updateProfile, changePassword } from '../../api/user.js';
 
 const ProfilePage = () => {
-  const { user } = useAppState();
-  const dispatch = useAppDispatch();
+  const { token, user, setUser, refreshProfile } = useAuth();
   const [feedback, setFeedback] = useState({ open: false, message: '', severity: 'success' });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const res = await fetchProfile(token);
+        setUser(res.user);
+      } catch (err) {
+        console.error('Failed to load profile', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [token, setUser]);
 
   const profileSchema = useMemo(
     () => z.object({
-      name: z.string().min(2, 'Enter your full name'),
+      username: z.string().min(2, 'Enter your username'),
       email: z.string().email('Enter a valid email'),
     }),
     [],
@@ -47,12 +64,13 @@ const ProfilePage = () => {
   const {
     control: profileControl,
     handleSubmit: handleProfileSubmit,
+    reset: resetProfile,
     formState: { isSubmitting: profileSubmitting },
   } = useForm({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      name: user.name,
-      email: user.email,
+      username: user?.username || '',
+      email: user?.email || '',
     },
   });
 
@@ -70,15 +88,31 @@ const ProfilePage = () => {
     },
   });
 
-  const onProfileSubmit = handleProfileSubmit((values) => {
-    dispatch({ type: 'UPDATE_PROFILE', payload: { name: values.name, email: values.email } });
-    setFeedback({ open: true, message: 'Profile updated successfully', severity: 'success' });
+  useEffect(() => {
+    resetProfile({
+      username: user?.username || '',
+      email: user?.email || '',
+    });
+  }, [user, resetProfile]);
+
+  const onProfileSubmit = handleProfileSubmit(async (values) => {
+    try {
+      const res = await updateProfile(token, { username: values.username, email: values.email });
+      setUser(res.user);
+      setFeedback({ open: true, message: 'Profile updated successfully', severity: 'success' });
+    } catch (err) {
+      setFeedback({ open: true, message: err.message || 'Failed to update profile', severity: 'error' });
+    }
   });
 
   const onPasswordSubmit = handlePasswordSubmit((values) => {
-    dispatch({ type: 'UPDATE_PASSWORD', payload: { currentPassword: values.currentPassword, newPassword: values.newPassword } });
-    setFeedback({ open: true, message: 'Password updated', severity: 'success' });
-    resetPasswordForm();
+    changePassword(token, { currentPassword: values.currentPassword, newPassword: values.newPassword })
+      .then(() => {
+        setFeedback({ open: true, message: 'Password updated', severity: 'success' });
+        resetPasswordForm();
+        refreshProfile?.();
+      })
+      .catch((err) => setFeedback({ open: true, message: err.message || 'Failed to update password', severity: 'error' }));
   });
 
   return (
@@ -102,8 +136,8 @@ const ProfilePage = () => {
                   Update your name and email address used across the platform.
                 </Typography>
               </Stack>
-              <ControlledTextField control={profileControl} name="name" label="Full name" />
-              <ControlledTextField control={profileControl} name="email" label="Email" type="email" />
+              <ControlledTextField control={profileControl} name="username" label="Username" disabled={loading} />
+              <ControlledTextField control={profileControl} name="email" label="Email" type="email" disabled={loading} />
               <Stack direction="row" justifyContent="flex-end">
                 <Button type="submit" variant="contained" disabled={profileSubmitting}>
                   Save changes

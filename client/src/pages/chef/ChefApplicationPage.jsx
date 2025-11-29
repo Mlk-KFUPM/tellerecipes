@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -11,20 +11,42 @@ import BrandMark from '../../components/common/BrandMark.jsx';
 import AuthHeader from '../../components/auth/AuthHeader.jsx';
 import ControlledTextField from '../../components/forms/ControlledTextField.jsx';
 import ControlledCheckbox from '../../components/forms/ControlledCheckbox.jsx';
-import PasswordField from '../../components/forms/PasswordField.jsx';
-import { useAppDispatch, useAppState } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { applyChef, fetchProfile } from '../../api/chef.js';
 
 const ChefApplicationPage = () => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const { chefProfile, user } = useAppState();
+  const { token, user } = useAuth();
+  const [chefProfile, setChefProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await fetchProfile(token);
+        setChefProfile(res);
+      } catch (err) {
+        // Ignore 404s (no profile yet)
+        setChefProfile(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [token]);
+
+  if (loading) return null;
 
   if (chefProfile?.status === 'approved') {
     return <Navigate to="/app/chef" replace />;
   }
 
   if (chefProfile?.status === 'pending') {
-    return <Navigate to="/auth/become-chef/pending" replace />;
+    return <Navigate to="/app/become-chef/pending" replace />;
   }
 
   const existingEmails = useMemo(() => {
@@ -43,8 +65,7 @@ const ChefApplicationPage = () => {
       z.object({
         fullName: z.string().min(1, 'Tell us who you are'),
         email: z.string().email('Enter a valid email address'),
-        password: z.string().min(8, 'Use at least 8 characters for security'),
-        bio: z.string().min(50, 'Share at least 50 characters about your story and approach'),
+        bio: z.string().min(10, 'Share at least 10 characters about your story and approach'),
         specialties: z.string().min(1, 'List the cuisines or styles you focus on'),
         yearsExperience: z.coerce.number().min(0, 'Experience must be 0 or more').max(60, 'Enter a realistic range'),
         website: z.string().url('Include the full URL (https://...)').or(z.literal('')).optional(),
@@ -66,8 +87,7 @@ const ChefApplicationPage = () => {
     resolver: zodResolver(schema),
     defaultValues: {
       fullName: '',
-      email: '',
-      password: '',
+      email: user?.email || '',
       bio: '',
       specialties: '',
       yearsExperience: 0,
@@ -78,15 +98,14 @@ const ChefApplicationPage = () => {
     },
   });
 
-  const onSubmit = handleSubmit((values) => {
-    if (existingEmails.has(values.email.toLowerCase())) {
-      setError('email', { type: 'manual', message: 'This email is already registered. Use a different email address.' });
+  const onSubmit = handleSubmit(async (values) => {
+    if (!token) {
+      setError('email', { type: 'manual', message: 'Please sign in before applying.' });
       return;
     }
-
-    dispatch({
-      type: 'SUBMIT_CHEF_APPLICATION',
-      payload: {
+    try {
+      // Email check removed as we now force the user's email
+      await applyChef(token, {
         fullName: values.fullName,
         email: values.email,
         displayName: values.fullName,
@@ -99,10 +118,11 @@ const ChefApplicationPage = () => {
         phone: values.phone,
         website: values.website,
         signatureDish: values.signatureDish,
-      },
-    });
-
-    navigate('/auth/become-chef/pending', { replace: true });
+      });
+      navigate('/app/become-chef/pending', { replace: true });
+    } catch (err) {
+      setError('fullName', { type: 'manual', message: err.message || 'Failed to submit application' });
+    }
   });
 
   return (
@@ -114,8 +134,7 @@ const ChefApplicationPage = () => {
       />
       <Stack component="form" spacing={3} onSubmit={onSubmit} noValidate>
         <ControlledTextField control={control} name="fullName" label="Full name" autoComplete="name" />
-        <ControlledTextField control={control} name="email" label="Email" type="email" autoComplete="email" />
-        <PasswordField control={control} name="password" label="Create a password" autoComplete="new-password" />
+        <ControlledTextField control={control} name="email" label="Email" type="email" autoComplete="email" disabled />
         <ControlledTextField control={control} name="bio" label="Professional bio" multiline minRows={3} />
         <ControlledTextField
           control={control}

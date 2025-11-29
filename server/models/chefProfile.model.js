@@ -23,7 +23,6 @@ const chefProfileSchema = new Schema(
   { timestamps: true },
 );
 
-chefProfileSchema.index({ user: 1 });
 chefProfileSchema.index({ status: 1 });
 
 module.exports = model('ChefProfile', chefProfileSchema);

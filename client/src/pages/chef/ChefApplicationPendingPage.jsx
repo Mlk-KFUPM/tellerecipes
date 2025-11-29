@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -6,17 +7,38 @@ import Typography from '@mui/material/Typography';
 import AuthLayout from '../../layouts/AuthLayout.jsx';
 import BrandMark from '../../components/common/BrandMark.jsx';
 import AuthHeader from '../../components/auth/AuthHeader.jsx';
-import { useAppState } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { fetchProfile } from '../../api/chef.js';
 
 const ChefApplicationPendingPage = () => {
   const navigate = useNavigate();
-  const { chefProfile } = useAppState();
+  const { token } = useAuth();
+  const [chefProfile, setChefProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!chefProfile) {
-    return <Navigate to="/auth/become-chef" replace />;
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetchProfile(token);
+        setChefProfile({ ...res, id: res._id || res.id });
+      } catch (err) {
+        setChefProfile(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) load();
+  }, [token]);
+
+  if (loading) {
+    return null; // Or a loading spinner
   }
 
-  if (chefProfile.status === 'approved') {
+  if (!chefProfile) {
+    return <Navigate to="/app/become-chef" replace />;
+  }
+
+  if (!loading && chefProfile && chefProfile.status === 'approved') {
     return <Navigate to="/app/chef" replace />;
   }
 
@@ -29,8 +51,8 @@ const ChefApplicationPendingPage = () => {
       />
       <Stack spacing={3}>
         <Alert severity="info">
-          Thanks for applying, {chefProfile.displayName || chefProfile.name}! Keep an eye on your inbox for updates from TellerRecipes. As soon as we
-          approve your profile you&apos;ll be able to publish recipes.
+          Thanks for applying{chefProfile?.displayName ? `, ${chefProfile.displayName}` : ''}! Keep an eye on your inbox for updates from TellerRecipes. As
+          soon as we approve your profile you&apos;ll be able to publish recipes.
         </Alert>
         <Typography variant="body2" color="text.secondary">
           While you wait, you can prepare your first recipes or tidy up your ingredient lists. We&apos;ll send a confirmation email when your account is ready.

@@ -1,14 +1,13 @@
 import { useMemo } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { Controller, useForm } from 'react-hook-form';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Link from '@mui/material/Link';
-import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AuthLayout from '../../layouts/AuthLayout.jsx';
 import BrandMark from '../../components/common/BrandMark.jsx';
@@ -17,18 +16,17 @@ import ControlledTextField from '../../components/forms/ControlledTextField.jsx'
 import PasswordField from '../../components/forms/PasswordField.jsx';
 import AuthRedirectPrompt from '../../components/auth/AuthRedirectPrompt.jsx';
 import ControlledCheckbox from '../../components/forms/ControlledCheckbox.jsx';
-import { useAppDispatch } from '../../context/AppStateContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
+  const { login } = useAuth();
   const schema = useMemo(
     () =>
       z.object({
         email: z.string().min(1, 'Email is required'),
         password: z.string().min(1, 'Password is required'),
         remember: z.boolean(),
-        role: z.enum(['user', 'chef', 'admin']),
       }),
     [],
   );
@@ -40,33 +38,31 @@ const LoginPage = () => {
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      email: 'amina.baker@example.com',
-      password: 'password123',
+      email: '',
+      password: '',
       remember: true,
-      role: 'user',
     },
   });
 
-  const onSubmit = handleSubmit((values) => {
-    // TODO: integrate with auth API layer.
-    // eslint-disable-next-line no-console
-    console.log('login submit', values);
-    const actorIdByRole = {
-      admin: 'admin-001',
-      chef: 'user-001',
-      user: 'user-001',
-    };
-    dispatch({ type: 'SIGN_IN', payload: { role: values.role, actorId: actorIdByRole[values.role] } });
+  const location = useLocation();
+  const from = location.state?.from?.pathname || null;
 
+  const onSubmit = handleSubmit(async (values) => {
+    const user = await login({ email: values.email, password: values.password });
     const nextRoute =
-      values.role === 'chef' ? '/app/chef' : values.role === 'admin' ? '/app/admin' : '/app/user';
-    navigate(nextRoute);
+      from || (user.role === 'chef' ? '/app/chef' : user.role === 'admin' ? '/app/admin' : '/app/user');
+    navigate(nextRoute, { replace: true });
   });
 
   return (
     <AuthLayout>
       <BrandMark />
       <AuthHeader title="Welcome back" subtitle="Sign in to plan your next delicious meal." />
+      {location.state?.message && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          {location.state.message}
+        </Alert>
+      )}
       <Stack component="form" spacing={3} onSubmit={onSubmit} noValidate>
         <ControlledTextField control={control} name="email" label="Email" type="email" autoComplete="email" />
         <PasswordField control={control} name="password" label="Password" autoComplete="current-password" />
@@ -80,17 +76,6 @@ const LoginPage = () => {
             Forgot password?
           </Link>
         </Stack>
-        <Controller
-          name="role"
-          control={control}
-          render={({ field }) => (
-            <TextField select label="Sign in as" {...field}>
-              <MenuItem value="user">Registered User</MenuItem>
-              <MenuItem value="chef">Chef</MenuItem>
-              <MenuItem value="admin">Admin</MenuItem>
-            </TextField>
-          )}
-        />
         <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
           Sign in
         </Button>
@@ -98,7 +83,7 @@ const LoginPage = () => {
       <AuthRedirectPrompt prompt="New to TellerRecipes?" cta="Create an account" href="/auth/register" />
       <Typography variant="body2" color="text.secondary">
         Ready to share your own dishes?{' '}
-        <Link component={RouterLink} to="/auth/become-chef" underline="hover">
+        <Link component={RouterLink} to="/app/become-chef" underline="hover">
           Apply to become a chef
         </Link>
       </Typography>

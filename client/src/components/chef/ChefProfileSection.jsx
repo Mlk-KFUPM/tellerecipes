@@ -12,7 +12,6 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import ControlledTextField from '../forms/ControlledTextField.jsx';
-import { useAppDispatch } from '../../context/AppStateContext.jsx';
 
 const statusConfig = {
   approved: { label: 'Approved', color: 'success', message: 'You can publish recipes immediately. Keep your bio and specialties up to date.' },
@@ -36,8 +35,7 @@ const normalizeList = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const ChefProfileSection = ({ profile }) => {
-  const dispatch = useAppDispatch();
+const ChefProfileSection = ({ profile = null, onSave = () => {} }) => {
   const status = statusConfig[profile?.status] || statusConfig.pending;
 
   const defaultValues = useMemo(
@@ -68,17 +66,14 @@ const ChefProfileSection = ({ profile }) => {
   }, [defaultValues, reset]);
 
   const onSubmit = handleSubmit((values) => {
-    dispatch({
-      type: 'UPDATE_CHEF_PROFILE',
-      payload: {
-        displayName: values.displayName,
-        signatureDish: values.signatureDish,
-        bio: values.bio,
-        yearsExperience: values.yearsExperience,
-        specialties: normalizeList(values.specialties),
-        phone: values.phone,
-        website: values.website || '',
-      },
+    onSave({
+      displayName: values.displayName,
+      signatureDish: values.signatureDish,
+      bio: values.bio,
+      yearsExperience: values.yearsExperience,
+      specialties: normalizeList(values.specialties),
+      phone: values.phone,
+      website: values.website || '',
     });
   });
 
@@ -151,10 +146,9 @@ ChefProfileSection.propTypes = {
     website: PropTypes.string,
     status: PropTypes.string,
   }),
+  onSave: PropTypes.func,
 };
 
-ChefProfileSection.defaultProps = {
-  profile: null,
-};
+
 
 export default ChefProfileSection;

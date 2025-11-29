@@ -9,7 +9,7 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
-const ReviewForm = ({ onSubmit, isSubmitting }) => {
+const ReviewForm = ({ onSubmit, isSubmitting = false }) => {
   const schema = useMemo(
     () =>
       z.object({
@@ -74,8 +74,6 @@ ReviewForm.propTypes = {
   isSubmitting: PropTypes.bool,
 };
 
-ReviewForm.defaultProps = {
-  isSubmitting: false,
-};
+
 
 export default ReviewForm;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
@@ -17,28 +17,44 @@ import Tooltip from '@mui/material/Tooltip';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import MenuIcon from '@mui/icons-material/Menu';
 import { NavLink } from 'react-router-dom';
-import { useAppDispatch, useAppState } from '../context/AppStateContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { getShoppingList } from '../api/user.js';
 
 const DashboardLayout = ({ role }) => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const { user, shoppingList, session, admin } = useAppState();
+  const { user: authUser, role: authRole, token, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const [navAnchorEl, setNavAnchorEl] = useState(null);
+  const [shoppingListCount, setShoppingListCount] = useState(0);
 
-  const shoppingListCount = shoppingList.recipeIds.length;
-
-  const actorProfile = useMemo(() => {
-    if (session.role === 'admin') {
-      return admin.users.find((adminUser) => adminUser.id === session.actorId) || { name: 'Admin' };
+  useEffect(() => {
+    let isMounted = true;
+    if (!authUser) {
+      setShoppingListCount(0);
+      return;
     }
-    return user;
-  }, [session.role, session.actorId, admin.users, user]);
+    (async () => {
+      try {
+        const list = await getShoppingList(token);
+        if (isMounted) {
+          setShoppingListCount((list?.recipeIds || []).length);
+        }
+      } catch (err) {
+        // non-blocking
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser, token]);
+
+  const actorProfile = useMemo(() => authUser || {}, [authUser]);
 
   const avatarInitials = useMemo(() => {
-    const [first = '', second = ''] = (actorProfile.name || '').split(' ');
+    const displayName = actorProfile.name || actorProfile.username || actorProfile.email || '';
+    const [first = '', second = ''] = displayName.split(' ');
     return `${first.charAt(0)}${second.charAt(0)}`.toUpperCase();
-  }, [actorProfile.name]);
+  }, [actorProfile.name, actorProfile.username, actorProfile.email]);
 
   const handleProfileMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
@@ -62,12 +78,12 @@ const DashboardLayout = ({ role }) => {
     handleProfileMenuClose();
   };
 
-  const handleSignOut = () => {
-    dispatch({ type: 'SIGN_OUT' });
+  const handleSignOut = async () => {
+    await logout();
     handleNavigate('/auth/login');
   };
 
-  const currentRole = role || session.role;
+  const currentRole = role || authRole;
 
   const navItems = useMemo(() => {
     if (currentRole === 'chef') {

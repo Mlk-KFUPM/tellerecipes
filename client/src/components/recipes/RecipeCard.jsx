@@ -12,31 +12,34 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import LocalDiningIcon from "@mui/icons-material/LocalDining";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
-const RecipeCard = ({ recipe, onOpen, onSave, onAddToList }) => (
-  <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-    <CardMedia
-      component="img"
-      height="180"
-      image={recipe.image}
-      alt={recipe.title}
-      sx={{ objectFit: "cover" }}
-    />
-    <CardContent sx={{ flexGrow: 1 }}>
-      <Stack spacing={1.5}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            {recipe.title}
-          </Typography>
-          <Chip
-            label={`${recipe.rating.average} ★`}
-            size="small"
-            color="primary"
-          />
-        </Stack>
+const RecipeCard = ({ recipe, onOpen, onSave, onAddToList }) => {
+  const rating = recipe.ratingSummary || recipe.rating || { average: 0, count: 0 };
+
+  return (
+    <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <CardMedia
+        component="img"
+        height="180"
+        image={recipe.image}
+        alt={recipe.title}
+        sx={{ objectFit: "cover" }}
+      />
+      <CardContent sx={{ flexGrow: 1 }}>
+        <Stack spacing={1.5}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              {recipe.title}
+            </Typography>
+            <Chip
+              label={`${rating.average} ★`}
+              size="small"
+              color="primary"
+            />
+          </Stack>
         <Typography variant="body2" color="text.secondary" noWrap>
           {recipe.description}
         </Typography>
@@ -78,6 +81,8 @@ const RecipeCard = ({ recipe, onOpen, onSave, onAddToList }) => (
   </Card>
 );
 
+};
+
 RecipeCard.propTypes = {
   recipe: PropTypes.shape({
     id: PropTypes.string.isRequired,
@@ -85,9 +90,13 @@ RecipeCard.propTypes = {
     description: PropTypes.string.isRequired,
     image: PropTypes.string.isRequired,
     rating: PropTypes.shape({
-      average: PropTypes.number.isRequired,
-      count: PropTypes.number.isRequired,
-    }).isRequired,
+      average: PropTypes.number,
+      count: PropTypes.number,
+    }),
+    ratingSummary: PropTypes.shape({
+      average: PropTypes.number,
+      count: PropTypes.number,
+    }),
     cookTime: PropTypes.number.isRequired,
     servings: PropTypes.number.isRequired,
     cuisine: PropTypes.string.isRequired,
