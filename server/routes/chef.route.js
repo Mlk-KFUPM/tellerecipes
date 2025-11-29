@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { ChefProfile, Recipe, Review, User } = require('../models');
+const { ChefProfile, Recipe, Review, User, Category } = require('../models');
 
 const router = express.Router();
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -98,6 +98,28 @@ router.post('/recipes', requireAuth, requireRole('chef', 'admin'), async (req, r
       return res.status(400).json({ error: 'title and description are required' });
     }
 
+    // Resolve categories
+    if (data.categories && Array.isArray(data.categories)) {
+      const categoryIds = [];
+      for (const label of data.categories) {
+        if (typeof label === 'string') {
+          const slug = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          let category = await Category.findOne({ slug });
+          if (!category) {
+            category = await Category.create({
+              label: label.trim(),
+              slug,
+              type: 'category',
+            });
+          }
+          categoryIds.push(category._id);
+        } else if (isValidObjectId(label)) {
+           categoryIds.push(label);
+        }
+      }
+      data.categories = categoryIds;
+    }
+
     const profile = await ChefProfile.findOne({ user: req.user._id });
     const recipe = await Recipe.create({
       ...data,
@@ -113,7 +135,10 @@ router.post('/recipes', requireAuth, requireRole('chef', 'admin'), async (req, r
     return res.status(201).json({ id: recipe._id, status: recipe.status });
   } catch (error) {
     console.error('Chef create recipe error', error);
-    return res.status(500).json({ error: 'Failed to create recipe' });
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message });
+    }
+    return res.status(500).json({ error: error.message || 'Failed to create recipe' });
   }
 });
 
@@ -126,6 +151,29 @@ router.patch('/recipes/:id', requireAuth, requireRole('chef', 'admin'), async (r
     if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
 
     const before = recipe.toObject();
+    
+    // Resolve categories if present
+    if (req.body.categories && Array.isArray(req.body.categories)) {
+      const categoryIds = [];
+      for (const label of req.body.categories) {
+        if (typeof label === 'string') {
+          const slug = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          let category = await Category.findOne({ slug });
+          if (!category) {
+            category = await Category.create({
+              label: label.trim(),
+              slug,
+              type: 'category',
+            });
+          }
+          categoryIds.push(category._id);
+        } else if (isValidObjectId(label)) {
+           categoryIds.push(label);
+        }
+      }
+      req.body.categories = categoryIds;
+    }
+
     Object.assign(recipe, req.body || {});
 
     const majorFields = ['title', 'description', 'cuisine', 'dietary', 'categories', 'ingredients', 'steps'];

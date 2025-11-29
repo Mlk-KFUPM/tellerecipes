@@ -409,6 +409,20 @@ router.patch('/users/:id/status', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // If activating a chef, also approve their profile
+    if (status === 'active' && user.role === 'chef') {
+      // Use findOneAndUpdate to ensure we catch it even if the user object above was stale (though new:true should prevent that)
+      // Also, we explicitly look for the profile associated with this user ID.
+      await ChefProfile.findOneAndUpdate(
+        { user: id },
+        {
+          status: 'approved',
+          approvedAt: new Date(),
+          approvedBy: req.user._id,
+        },
+      );
+    }
+
     return res.json(user);
   } catch (error) {
     console.error('Update user status error', error);

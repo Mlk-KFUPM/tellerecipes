@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
@@ -43,17 +44,25 @@ const LoginPage = () => {
     },
   });
 
+  const location = useLocation();
+  const from = location.state?.from?.pathname || null;
+
   const onSubmit = handleSubmit(async (values) => {
     const user = await login({ email: values.email, password: values.password });
     const nextRoute =
-      user.role === 'chef' ? '/app/chef' : user.role === 'admin' ? '/app/admin' : '/app/user';
-    navigate(nextRoute);
+      from || (user.role === 'chef' ? '/app/chef' : user.role === 'admin' ? '/app/admin' : '/app/user');
+    navigate(nextRoute, { replace: true });
   });
 
   return (
     <AuthLayout>
       <BrandMark />
       <AuthHeader title="Welcome back" subtitle="Sign in to plan your next delicious meal." />
+      {location.state?.message && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          {location.state.message}
+        </Alert>
+      )}
       <Stack component="form" spacing={3} onSubmit={onSubmit} noValidate>
         <ControlledTextField control={control} name="email" label="Email" type="email" autoComplete="email" />
         <PasswordField control={control} name="password" label="Password" autoComplete="current-password" />
@@ -74,7 +83,7 @@ const LoginPage = () => {
       <AuthRedirectPrompt prompt="New to TellerRecipes?" cta="Create an account" href="/auth/register" />
       <Typography variant="body2" color="text.secondary">
         Ready to share your own dishes?{' '}
-        <Link component={RouterLink} to="/auth/become-chef" underline="hover">
+        <Link component={RouterLink} to="/app/become-chef" underline="hover">
           Apply to become a chef
         </Link>
       </Typography>

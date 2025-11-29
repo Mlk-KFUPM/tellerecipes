@@ -35,7 +35,7 @@ const normalizeList = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const ChefProfileSection = ({ profile, onSave }) => {
+const ChefProfileSection = ({ profile = null, onSave = () => {} }) => {
   const status = statusConfig[profile?.status] || statusConfig.pending;
 
   const defaultValues = useMemo(
@@ -149,9 +149,6 @@ ChefProfileSection.propTypes = {
   onSave: PropTypes.func,
 };
 
-ChefProfileSection.defaultProps = {
-  profile: null,
-  onSave: () => {},
-};
+
 
 export default ChefProfileSection;

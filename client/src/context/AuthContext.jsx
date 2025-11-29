@@ -24,10 +24,18 @@ export const AuthProvider = ({ children }) => {
         setStatus('authenticated');
       } catch (err) {
         console.error('Auth bootstrap failed', err);
-        setToken('');
-        localStorage.removeItem('accessToken');
-        setUser(null);
-        setStatus('idle');
+        // Only clear token if it's an auth error (401/403)
+        if (err.status === 401 || err.status === 403) {
+          setToken('');
+          localStorage.removeItem('accessToken');
+          setUser(null);
+          setStatus('idle');
+        } else {
+          // For other errors (network, 500), keep the token but show error state
+          // This prevents logging out on refresh if server is temporarily unreachable
+          setError(err.message || 'Failed to restore session');
+          setStatus('error');
+        }
       }
     };
     bootstrap();

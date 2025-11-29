@@ -96,7 +96,7 @@ const RegisterPage = () => {
       />
       <Typography variant="body2" color="text.secondary">
         Looking to publish your own recipes?{" "}
-        <Link component={RouterLink} to="/auth/become-chef" underline="hover">
+        <Link component={RouterLink} to="/app/become-chef" underline="hover">
           Apply to become a chef
         </Link>
       </Typography>

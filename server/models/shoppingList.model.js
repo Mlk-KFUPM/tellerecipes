@@ -20,6 +20,4 @@ const shoppingListSchema = new Schema(
   { timestamps: true },
 );
 
-shoppingListSchema.index({ user: 1 });
-
 module.exports = model('ShoppingList', shoppingListSchema);

@@ -28,8 +28,6 @@ const userSchema = new Schema(
   { timestamps: true }
 );
 
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
 userSchema.index({ role: 1, status: 1 });
 
 module.exports = model("User", userSchema);

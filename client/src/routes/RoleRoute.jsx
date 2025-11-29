@@ -3,8 +3,12 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const RoleRoute = ({ allowedRoles, redirectTo }) => {
-  const { role } = useAuth();
+  const { role, status } = useAuth();
   const location = useLocation();
+
+  if (status === 'loading') {
+    return null;
+  }
 
   if (!role || !allowedRoles.includes(role)) {
     return <Navigate to={redirectTo} replace state={{ from: location }} />;

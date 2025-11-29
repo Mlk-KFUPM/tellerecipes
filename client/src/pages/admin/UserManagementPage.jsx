@@ -86,10 +86,13 @@ const UserManagementPage = () => {
           const updated = await updateUserStatus(token, user.id, 'deactivated');
           setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...updated, id: updated._id || updated.id } : u)));
           setFeedback({ severity: 'info', message: `${user.username} deactivated.` });
-        } else if (action === 'activate') {
+        } else if (action === 'activate' || action === 'approve') {
           const updated = await updateUserStatus(token, user.id, 'active');
           setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, ...updated, id: updated._id || updated.id } : u)));
-          setFeedback({ severity: 'success', message: `${user.username} reactivated.` });
+          setFeedback({
+            severity: 'success',
+            message: action === 'approve' ? `${user.username} approved as Chef.` : `${user.username} reactivated.`,
+          });
         } else if (action === 'delete') {
           await deleteUser(token, user.id);
           setUsers((prev) => prev.filter((u) => u.id !== user.id));
@@ -230,13 +233,14 @@ const UserManagementPage = () => {
                     ) : (
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant={user.role === 'chef' && user.status === 'pending' ? 'contained' : 'outlined'}
+                        color={user.role === 'chef' && user.status === 'pending' ? 'success' : 'primary'}
                         onClick={(event) => {
                           event.stopPropagation();
-                          openConfirm('activate', user);
+                          openConfirm(user.role === 'chef' && user.status === 'pending' ? 'approve' : 'activate', user);
                         }}
                       >
-                        Reactivate
+                        {user.role === 'chef' && user.status === 'pending' ? 'Approve' : 'Reactivate'}
                       </Button>
                     )}
                     <Button
@@ -309,6 +313,8 @@ const UserManagementPage = () => {
               ? 'promote this user to chef?'
               : confirm?.action === 'revoke'
               ? 'revoke the chef role?'
+              : confirm?.action === 'approve'
+              ? 'approve this chef application?'
               : confirm?.action === 'activate'
               ? 'reactivate this account?'
               : 'deactivate this account?'}

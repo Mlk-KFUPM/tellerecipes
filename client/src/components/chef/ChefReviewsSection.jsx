@@ -10,7 +10,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import dayjs from 'dayjs';
 
-const ChefReviewsSection = ({ recipes, chefName, onReply }) => {
+const ChefReviewsSection = ({ recipes = [], chefName = 'Chef', onReply = () => {} }) => {
   const [drafts, setDrafts] = useState({});
 
   const recipesWithReviews = useMemo(
@@ -149,10 +149,6 @@ ChefReviewsSection.propTypes = {
   onReply: PropTypes.func,
 };
 
-ChefReviewsSection.defaultProps = {
-  recipes: [],
-  chefName: 'Chef',
-  onReply: () => {},
-};
+
 
 export default ChefReviewsSection;

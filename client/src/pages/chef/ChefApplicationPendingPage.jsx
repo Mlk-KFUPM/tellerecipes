@@ -30,8 +30,12 @@ const ChefApplicationPendingPage = () => {
     if (token) load();
   }, [token]);
 
-  if (!loading && !chefProfile) {
-    return <Navigate to="/auth/become-chef" replace />;
+  if (loading) {
+    return null; // Or a loading spinner
+  }
+
+  if (!chefProfile) {
+    return <Navigate to="/app/become-chef" replace />;
   }
 
   if (!loading && chefProfile && chefProfile.status === 'approved') {
@@ -47,8 +51,8 @@ const ChefApplicationPendingPage = () => {
       />
       <Stack spacing={3}>
         <Alert severity="info">
-          Thanks for applying, {chefProfile.displayName || chefProfile.name}! Keep an eye on your inbox for updates from TellerRecipes. As soon as we
-          approve your profile you&apos;ll be able to publish recipes.
+          Thanks for applying{chefProfile?.displayName ? `, ${chefProfile.displayName}` : ''}! Keep an eye on your inbox for updates from TellerRecipes. As
+          soon as we approve your profile you&apos;ll be able to publish recipes.
         </Alert>
         <Typography variant="body2" color="text.secondary">
           While you wait, you can prepare your first recipes or tidy up your ingredient lists. We&apos;ll send a confirmation email when your account is ready.

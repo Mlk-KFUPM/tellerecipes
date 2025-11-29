@@ -2,7 +2,14 @@ import PropTypes from 'prop-types';
 import { Controller } from 'react-hook-form';
 import TextField from '@mui/material/TextField';
 
-const ControlledTextField = ({ control, name, label, type, InputProps, ...rest }) => (
+const ControlledTextField = ({
+  control,
+  name,
+  label,
+  type = 'text',
+  InputProps = undefined,
+  ...rest
+}) => (
   <Controller
     name={name}
     control={control}
@@ -27,11 +34,6 @@ ControlledTextField.propTypes = {
   label: PropTypes.string.isRequired,
   type: PropTypes.string,
   InputProps: PropTypes.object,
-};
-
-ControlledTextField.defaultProps = {
-  type: 'text',
-  InputProps: undefined,
 };
 
 export default ControlledTextField;

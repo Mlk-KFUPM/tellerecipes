@@ -123,7 +123,7 @@ const toFormShape = (recipe) =>
           alternatives: (ingredient.alternatives || []).join(', '),
         })),
         steps: (recipe.steps || []).map((step) => ({
-          description: step,
+          description: step.description || '',
         })),
         changeType: 'minor',
       }
@@ -230,7 +230,9 @@ const ChefRecipeManager = ({ recipes, profileStatus, onCreate, onUpdate, onDelet
         unit: ingredient.unit || '',
         alternatives: normalizeList(ingredient.alternatives || ''),
       })),
-      steps: values.steps.map((step) => step.description.trim()).filter(Boolean),
+      steps: values.steps
+        .map((step, index) => ({ description: step.description.trim(), order: index + 1 }))
+        .filter((step) => step.description),
     };
 
     if (mode === 'create') {

@@ -118,7 +118,7 @@ const ChefDashboardPage = () => {
         <Typography variant="body1" color="text.secondary">
           You have not submitted a chef application yet. Start by sharing your story and experience so our team can approve your contributor account.
         </Typography>
-        <Button variant="contained" onClick={() => navigate('/auth/become-chef')} sx={{ alignSelf: 'flex-start' }}>
+        <Button variant="contained" onClick={() => navigate('/app/become-chef')} sx={{ alignSelf: 'flex-start' }}>
           Apply now
         </Button>
       </Stack>
