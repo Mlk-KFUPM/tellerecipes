@@ -34,7 +34,7 @@ Vite + React implementation of the TellerRecipes prototype. This project simulat
 
 5. Start the server:
    ```bash
-   npm run dev
+   node server.js
    ```
 
 ### Frontend Setup
