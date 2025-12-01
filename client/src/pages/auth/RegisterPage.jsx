@@ -35,9 +35,9 @@ const RegisterPage = () => {
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      fullName: "Amina Baker",
-      email: "amina.baker@example.com",
-      password: "password123",
+      fullName: "",
+      email: "",
+      password: "",
     },
   });
 
