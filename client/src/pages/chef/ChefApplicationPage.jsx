@@ -39,16 +39,6 @@ const ChefApplicationPage = () => {
     load();
   }, [token]);
 
-  if (loading) return null;
-
-  if (chefProfile?.status === 'approved') {
-    return <Navigate to="/app/chef" replace />;
-  }
-
-  if (chefProfile?.status === 'pending') {
-    return <Navigate to="/app/become-chef/pending" replace />;
-  }
-
   const existingEmails = useMemo(() => {
     const emails = new Set();
     if (user?.email) {
@@ -97,6 +87,16 @@ const ChefApplicationPage = () => {
       acceptTerms: false,
     },
   });
+
+  if (loading) return null;
+
+  if (chefProfile?.status === 'approved') {
+    return <Navigate to="/app/chef" replace />;
+  }
+
+  if (chefProfile?.status === 'pending') {
+    return <Navigate to="/app/become-chef/pending" replace />;
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     if (!token) {

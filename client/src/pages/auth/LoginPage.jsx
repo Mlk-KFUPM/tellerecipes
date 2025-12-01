@@ -34,7 +34,8 @@ const LoginPage = () => {
   const {
     control,
     handleSubmit,
-    formState: { isSubmitting },
+    setError,
+    formState: { isSubmitting, errors },
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -48,10 +49,17 @@ const LoginPage = () => {
   const from = location.state?.from?.pathname || null;
 
   const onSubmit = handleSubmit(async (values) => {
-    const user = await login({ email: values.email, password: values.password });
-    const nextRoute =
-      from || (user.role === 'chef' ? '/app/chef' : user.role === 'admin' ? '/app/admin' : '/app/user');
-    navigate(nextRoute, { replace: true });
+    try {
+      const user = await login({ email: values.email, password: values.password });
+      const nextRoute =
+        from || (user.role === 'chef' ? '/app/chef' : user.role === 'admin' ? '/app/admin' : '/app/user');
+      navigate(nextRoute, { replace: true });
+    } catch (err) {
+      setError('root', {
+        type: 'manual',
+        message: err.message || 'Failed to sign in. Please check your credentials.',
+      });
+    }
   });
 
   return (
@@ -61,6 +69,11 @@ const LoginPage = () => {
       {location.state?.message && (
         <Alert severity="info" sx={{ mb: 3 }}>
           {location.state.message}
+        </Alert>
+      )}
+      {errors.root && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {errors.root.message}
         </Alert>
       )}
       <Stack component="form" spacing={3} onSubmit={onSubmit} noValidate>

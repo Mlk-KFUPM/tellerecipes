@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Button from "@mui/material/Button";
+import Alert from "@mui/material/Alert";
 import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -31,7 +32,8 @@ const RegisterPage = () => {
   const {
     control,
     handleSubmit,
-    formState: { isSubmitting },
+    setError,
+    formState: { isSubmitting, errors },
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -41,16 +43,22 @@ const RegisterPage = () => {
     },
   });
 
-  const onSubmit = handleSubmit((values) => {
-    registerUser({
-      username: values.fullName,
-      email: values.email,
-      password: values.password,
-    }).then((user) => {
+  const onSubmit = handleSubmit(async (values) => {
+    try {
+      const user = await registerUser({
+        username: values.fullName,
+        email: values.email,
+        password: values.password,
+      });
       const nextRoute =
         user.role === "chef" ? "/app/chef" : user.role === "admin" ? "/app/admin" : "/app/user";
       navigate(nextRoute);
-    });
+    } catch (err) {
+      setError("root", {
+        type: "manual",
+        message: err.message || "Failed to create account. Please try again.",
+      });
+    }
   });
 
   return (
@@ -60,6 +68,11 @@ const RegisterPage = () => {
         title="Create your account"
         subtitle="Join TellerRecipes and bring order to your kitchen."
       />
+      {errors.root && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {errors.root.message}
+        </Alert>
+      )}
       <Stack component="form" spacing={3} onSubmit={onSubmit} noValidate>
         <ControlledTextField
           control={control}
