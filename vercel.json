@@ -15,7 +15,23 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
+      "src": "/auth/(.*)",
+      "dest": "/server/index.js"
+    },
+    {
+      "src": "/user/(.*)",
+      "dest": "/server/index.js"
+    },
+    {
+      "src": "/chef/(.*)",
+      "dest": "/server/index.js"
+    },
+    {
+      "src": "/admin/(.*)",
+      "dest": "/server/index.js"
+    },
+    {
+      "src": "/health",
       "dest": "/server/index.js"
     },
     {
