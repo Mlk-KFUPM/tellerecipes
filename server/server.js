@@ -29,7 +29,8 @@ const isDev = process.env.NODE_ENV !== "production";
 const configuredOrigins = (process.env.CLIENT_ORIGINS || "")
   .split(",")
   .flatMap(expandOrigin);
-const allowedOriginSet = new Set([...configuredOrigins, ...defaultOrigins]);
+
+const allowedOriginSet = new Set(isDev ? [...configuredOrigins, ...defaultOrigins] : configuredOrigins);
 const allowAllOrigins = allowedOriginSet.has("*");
 const effectiveOrigins = allowAllOrigins
   ? []
@@ -37,8 +38,6 @@ const effectiveOrigins = allowAllOrigins
 
 const corsOptions = {
   origin: (origin, callback) => {
-    console.log("Incoming request origin:", origin); // <--- THIS LOG IS CRITICAL
-
     // 1. Allow requests with no origin (like Postman or server-to-server)
     if (!origin) {
       return callback(null, true);
@@ -50,7 +49,7 @@ const corsOptions = {
     }
 
     // 3. Block otherwise
-    console.warn(`BLOCKED BY CORS: ${origin}`); // <--- Will tell us if it's failing here
+    console.warn(`BLOCKED BY CORS: ${origin}`); 
     console.warn(`Allowed Origins are:`, Array.from(allowedOriginSet));
     return callback(new Error("Not allowed by CORS"));
   },

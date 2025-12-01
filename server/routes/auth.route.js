@@ -11,6 +11,12 @@ const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'dev-refresh-se
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '15m';
 const REFRESH_TOKEN_DAYS = parseInt(process.env.REFRESH_TOKEN_DAYS || '7', 10);
 
+if (process.env.NODE_ENV === 'production') {
+  if (ACCESS_TOKEN_SECRET === 'dev-access-secret' || REFRESH_TOKEN_SECRET === 'dev-refresh-secret') {
+    throw new Error('FATAL: Production environment detected but using insecure default secrets. Set ACCESS_TOKEN_SECRET and REFRESH_TOKEN_SECRET.');
+  }
+}
+
 const sanitizeUser = (user) => ({
   id: user._id,
   username: user.username,

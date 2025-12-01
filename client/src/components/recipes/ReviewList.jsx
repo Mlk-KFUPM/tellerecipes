@@ -20,7 +20,7 @@ const ReviewList = ({ reviews = [] }) => {
       {reviews.map((review) => (
         <Stack key={review.id} spacing={1.5}>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="subtitle2">{review.author}</Typography>
+            <Typography variant="subtitle2">{review.displayName || review.author}</Typography>
             <Rating value={review.rating} readOnly size="small" />
             <Typography variant="caption" color="text.disabled">
               {dayjs(review.createdAt).format("MMM D, YYYY")}
@@ -44,7 +44,7 @@ const ReviewList = ({ reviews = [] }) => {
                   <Stack key={reply.id} spacing={0.5}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       <Typography variant="subtitle2" color="primary.main">
-                        {reply.author}
+                        {reply.displayName || reply.author}
                       </Typography>
                       <Typography variant="caption" color="text.disabled">
                         {dayjs(reply.createdAt).format("MMM D, YYYY h:mm A")}
@@ -68,6 +68,7 @@ ReviewList.propTypes = {
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       author: PropTypes.string.isRequired,
+      displayName: PropTypes.string,
       rating: PropTypes.number.isRequired,
       comment: PropTypes.string.isRequired,
       createdAt: PropTypes.string.isRequired,
@@ -75,6 +76,7 @@ ReviewList.propTypes = {
         PropTypes.shape({
           id: PropTypes.string.isRequired,
           author: PropTypes.string.isRequired,
+          displayName: PropTypes.string,
           comment: PropTypes.string.isRequired,
           createdAt: PropTypes.string.isRequired,
         })
