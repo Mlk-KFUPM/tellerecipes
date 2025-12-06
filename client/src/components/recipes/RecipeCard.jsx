@@ -35,7 +35,7 @@ const RecipeCard = ({ recipe, onOpen, onSave, onAddToList }) => {
               {recipe.title}
             </Typography>
             <Chip
-              label={`${rating.average} ★`}
+              label={`${Number(rating.average).toFixed(1)} ★`}
               size="small"
               color="primary"
             />

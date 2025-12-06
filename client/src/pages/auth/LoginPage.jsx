@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
-import FormControlLabel from '@mui/material/FormControlLabel';
+
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -15,7 +15,7 @@ import AuthHeader from '../../components/auth/AuthHeader.jsx';
 import ControlledTextField from '../../components/forms/ControlledTextField.jsx';
 import PasswordField from '../../components/forms/PasswordField.jsx';
 import AuthRedirectPrompt from '../../components/auth/AuthRedirectPrompt.jsx';
-import ControlledCheckbox from '../../components/forms/ControlledCheckbox.jsx';
+
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const LoginPage = () => {
@@ -26,7 +26,6 @@ const LoginPage = () => {
       z.object({
         email: z.string().min(1, 'Email is required'),
         password: z.string().min(1, 'Password is required'),
-        remember: z.boolean(),
       }),
     [],
   );
@@ -41,7 +40,6 @@ const LoginPage = () => {
     defaultValues: {
       email: '',
       password: '',
-      remember: true,
     },
   });
 
@@ -79,16 +77,7 @@ const LoginPage = () => {
       <Stack component="form" spacing={3} onSubmit={onSubmit} noValidate>
         <ControlledTextField control={control} name="email" label="Email" type="email" autoComplete="email" />
         <PasswordField control={control} name="password" label="Password" autoComplete="current-password" />
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <FormControlLabel
-            control={<ControlledCheckbox control={control} name="remember" />}
-            label="Remember me"
-            componentsProps={{ typography: { variant: 'body2' } }}
-          />
-          <Link href="/auth/reset-password" variant="body2" underline="hover">
-            Forgot password?
-          </Link>
-        </Stack>
+
         <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
           Sign in
         </Button>
